@@ -12,26 +12,26 @@ library(GAMIBHEAR)
 library(stringr)
 library(data.table)
 
+args = commandArgs(trailingOnly=TRUE)
+
 # load pileup results
-vcf_dir_1 = '/fast/groups/ag_schwarz/Projects/project-gam/H1/AS/results/pileup/Repl1'
-vcf_dir_2 = '/fast/groups/ag_schwarz/Projects/project-gam/H1/AS/results/pileup/Repl2'
-files_1 = list.files(path = vcf_dir_1, pattern = '*.pileup.vcf$')
-files_2 = list.files(path = vcf_dir_2, pattern = '*.pileup.vcf$')
+files = list.files(path = ".", pattern = '*.pileup')
 
-VCF_list_1 = load_sample_VCF(files_1,vcf_dir_1)
-VCF_list_2 = load_sample_VCF(files_2,vcf_dir_2)
+VCF_list = load_sample_VCF(files,vcf_dir)
 
-processed_SNVs = process_sample_VCF(c(VCF_list_1,VCF_list_2))
+processed_SNVs = process_sample_VCF(VCF_list)
 # dim(processed_SNVs) [1] 1911075       7
 processed_SNVs$repl=1
-processed_SNVs$repl[which(as.numeric(str_sub(processed_SNVs$SAMPLE,7))>length(files_1))]=2
+processed_SNVs$repl[which(as.numeric(str_sub(processed_SNVs$SAMPLE,7))>length(files))]=2
 
 # load truth, merge
-H1_truth=readRDS("/fast/groups/ag_schwarz/Projects/project-gam/H1/data/H1_haplotypes_dixon/H1_dixon_haplotypes_liftover_hg38.rds")
+H1_truth=readRDS(args[0])
+# refs /fast/groups/ag_schwarz/Projects/project-gam/H1/data/H1_haplotypes_dixon/H1_dixon_haplotypes_liftover_hg38.rds
 processed_SNVs_merged_truth=merge(processed_SNVs,H1_truth,by=c('CHROM','POS'),all.x=T,all.y=F)
 # dim(processed_SNVs_merged_truth) [1] 1911075      15
 
 # load mappability, merge
+# refs /fast/groups/ag_schwarz/Projects/project-gam/H1/Genotyping/intermediate/mappability/mapinter_v3
 mapp=fread('/fast/groups/ag_schwarz/Projects/project-gam/H1/Genotyping/intermediate/mappability/mapinter_v3')
 mappdb=as.data.frame(mapp)
 mappdb=mappdb[,c(1,2,7)]
@@ -91,26 +91,18 @@ processed_SNVs_merged_truth_mapp_phased_minmapp1_sameREF_sameALT$START = process
 processed_SNVs_merged_truth_mapp_phased_minmapp1_sameREF_sameALT$PARENT = c("p1","p2")[apply(processed_SNVs_merged_truth_mapp_phased_minmapp1_sameREF_sameALT[,c(17,18)],1,which.max)]
 SNP_seed_beds=processed_SNVs_merged_truth_mapp_phased_minmapp1_sameREF_sameALT[,c('CHROM','START','POS','ID','GT','PARENT','SAMPLE')]
 
-files=c(files_1,files_2)
 outfilenames=sub('\\.vcf$', '.closest_SNP_seed.bed', files)
 samples_sort = unique(SNP_seed_beds$SAMPLE)[order(as.numeric(substring(unique(SNP_seed_beds$SAMPLE), 7)))] # e.g. 'sample7'
 
 for (i in 1:length(files)){
     print(paste(i,' / ', length(files)))
     sample_seed_SNPs=SNP_seed_beds[which(SNP_seed_beds$SAMPLE==samples_sort[i]),]
-    if(i <= length(files_1)){
-        write.table(sample_seed_SNPs,paste('/fast/groups/ag_schwarz/Projects/project-gam/H1/AS/prelim/closest_SNP_seed_files/Repl1/',outfilenames[i],sep = ''),
-                    sep = '\t',
-                    quote = F,
-                    row.names = F,
-                    col.names = F)
-    }else{
-        write.table(sample_seed_SNPs,paste('/fast/groups/ag_schwarz/Projects/project-gam/H1/AS/prelim/closest_SNP_seed_files/Repl2/',outfilenames[i],sep = ''),
-                    sep = '\t',
-                    quote = F,
-                    row.names = F,
-                    col.names = F)
-    }
+    write.table(sample_seed_SNPs,paste('./',outfilenames[i],sep = ''),
+                sep = '\t',
+                quote = F,
+                row.names = F,
+                col.names = F)
+
 }
 
 ################################################################################
