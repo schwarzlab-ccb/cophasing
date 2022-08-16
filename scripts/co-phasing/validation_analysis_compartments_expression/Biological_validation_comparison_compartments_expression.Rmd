@@ -1,0 +1,1525 @@
+---
+title: "Biological validation of co-phased H1 chromatin contact maps -  comparison of chromatin compartment status and their expression level"
+author: "Julia Markowki"
+date: "3/2/2021"
+# output:
+#   pdf_document:
+#     latex_engine: xelatex
+# sansfont: Arial
+#sansfont: Calibri Light
+output: pdf_document
+  # pdf_document:
+  #   latex_engine: xelatex
+# fontsize: 10pt
+# classoption: 10pt
+# header-includes:
+#   - \usepackage{fontspec}
+#   - \setmainfont{Calibri}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE)
+options(width=200)
+# available options for size in descending order are:
+# Huge > huge > LARGE > Large > large > normalsize > small > footnotesize > scriptsize > tiny
+```
+
+```{r orga, include=FALSE, eval=FALSE}
+# Introduction, setting the scene, including aim
+# Data, load, clean, 
+## compartments, what is the "distribution" more same, more diff?, plot scores against each other
+## expression, distribution, normal distribution?, compare both 50 and 100, hist
+# combine both, are the distributions overlapping, boxplot / violin plot, significance in plot, significance test below
+# maybe test per genes as well
+# Fazit
+```
+
+
+# Introduction
+
+With our Co-Phasing approach we produced phased chromatin contact maps of H1 (I believe 200kb resolution, 200kb max distance between SNV and read), of which Sasha called compartments using PC1. Here we want to validate the results biologically by comparing chromatin compartments to activity aka expression. Teresa provided preprocessed publicly available GRO-Seq data for H1, showing nascent transcription activity, where expression values show read counts per genomic window in either 50kb or 100kb resolution; or Poly-A enriched RNA-Seq of H1 per gene. Expression data is not phased. The aim is to show that regions in which both homologous chromosomes are "active" (compartment A) show the highest expression, differentially called compartments, where one chromosome copy is "active" (A) and the other one "inactive" (B), show moderate, but at least lower expression, and regions where both homologous chromosomes are "inactive" (B) show the lowest expression. Here I want to demonstrate those differences and show, that they are siginificant.
+
+# Data
+
+In the first step I will load and clean the data, and explore the compartment calls and expression values independently. Later I will merge this information and proceed with the validation.
+
+## Compartments
+
+Sasha called chromatin compartments using PC1 on the two co-phased H1 chromatin contact maps in (presumably) 200kb resolution, as this yields robuster results. Now the compartments can either be both active A, one active one inactive AB, or both inactive B. The Genome Scores describe Eigenvalues. 
+
+### Preprocessing
+\footnotesize
+```{r load compartments, size="tiny"}
+### load compartments ----------------------------------------------------------
+#comp=read.csv("/fast/groups/ag_schwarz/Projects/project-gam/data/Co-Phasing/compartments/210222.Compartments.AB.H1.phased.first.PCA.csv",header = T, sep="\t")
+comp=read.csv("/Users/jmarkow/Desktop/GAM/Co-Phasing/data/compartments/210222.Compartments.AB.H1.phased.first.PCA.csv",header = T, sep="\t")
+
+### preprocess ----------------------------------------------------------------
+# check size
+dim(comp) # 11749     7
+
+# sort by chromosome and position
+comp = comp[order(comp$start),]
+comp = comp[order(as.numeric(substring(comp$chrom, 4))),]
+
+# add 1bp to every start position so that intervals are exclusive and not overlapping
+comp$start = comp$start + 1 
+
+# check chromosome set
+head(comp)
+unique(comp$chrom)
+    # no need to exclude sex or mitochondria chromosomes
+
+# combine called compartments of both chromosomes into one value
+comp$combined_comp_raw = paste(comp$Genome1_AB1, comp$Genome2_AB1, sep = '')
+comp$combined_comp_raw = factor(comp$combined_comp_raw, levels = c("AA", "AB", "BA", "BB"))
+```
+```{r comment out 1}
+    # table(comp$combined_comp_raw) / nrow(comp) * 100
+    #       AA       AB       BA       BB
+    # 32.75172 18.59733 21.46566 27.18529
+```
+```{r compartments continued}
+# reduce he compartment calls to AA / AB / BB
+comp$combined_comp = comp$combined_comp_raw
+comp$combined_comp[which(comp$combined_comp == "BA")] = "AB"
+comp$combined_comp = factor(comp$combined_comp, levels = c("AA", "AB", "BB"))
+
+# how many genomic windows are differentially called?
+comp_dist = table(comp$combined_comp) / nrow(comp) * 100
+comp_dist
+```
+The compartment dataset only includes autosomes. `r sum(comp_dist["AA"],comp_dist["BB"])` % of compartments agree between the homologous chromosomes, `r comp_dist["AB"]` % of compartments differ. 
+
+### Distribution of Genome Scores
+\footnotesize
+```{r plot Genome scores,fig.width=8,fig.height=4}
+par(mfrow=c(1,2),oma = c(0, 0, 2, 0),par(mar=c(4,4,0.1,0.1))) #bltr margins
+
+plot(x = comp$Genome1_score1,
+     y = comp$Genome2_score1,
+     pch = 19,
+     col = adjustcolor(c("limegreen","lightskyblue2","lightskyblue3","maroon")[comp$combined_comp_raw],alpha.f=0.2),
+     xlab = "Genome Score 1",
+     ylab = "Genome Score 2")
+text(x=2,y=2,labels = c("AA"))
+text(x=2,y=-2,labels = c("AB"))
+text(x=-2,y=2,labels = c("BA"))
+text(x=-2,y=-2,labels = c("BB"))
+boxplot(c(comp$Genome2_score1,comp$Genome1_score1)~c(comp$combined_comp_raw,comp$combined_comp_raw), outline=T,xaxt='none',col=c("limegreen","lightskyblue2","lightskyblue3","maroon"),xlab="Compartments",ylab="Genome Score")
+axis(1,at=1:4,label=c("AA", "AB", "BA", "BB"))
+mtext("Distribution of Genome Scores", outer = TRUE, cex = 1.2)
+```
+\normalsize
+
+## Expression
+Teresa used publicly available gene expression (poly-A enriched RNA-Seq) and nascent expression (GRO-Seq) data and provided expression values either per gene or in 50kb and 100kb windows, respectively. The values show read counts per window. We will concentrate on nascent expression data first and analyse the gene expression data later on.
+
+### Preprocessing
+\footnotesize
+```{r plot load expression}
+### load expression data  ------------------------------------------------------
+gene_exp=read.csv("/Users/jmarkow/Desktop/GAM/Co-Phasing/data/expression_data/genes_with_expression.bed",header = T, sep="\t")
+gro_50=read.csv("/Users/jmarkow/Desktop/GAM/Co-Phasing/data/expression_data/groseq_intersected_50kb.bed",header = F, sep="\t")
+gro_100=read.csv("/Users/jmarkow/Desktop/GAM/Co-Phasing/data/expression_data/groseq_intersected_100kb.bed",header = F, sep="\t")
+
+### concentrate on GRO-Seq first  ---------------------------------------------
+colnames(gro_50)=c("chrom","start","end","expression")
+colnames(gro_100)=c("chrom","start","end","expression")
+
+### preprocess ----------------------------------------------------------------
+# check size
+dim(gro_50) # 60630     4
+dim(gro_100) # 30321     4
+
+# sort by chromosome and position
+gro_50 = gro_50[order(gro_50$start),]
+gro_50 = gro_50[order(as.numeric(substring(gro_50$chrom, 4))),]
+gro_100 = gro_100[order(gro_100$start),]
+gro_100 = gro_100[order(as.numeric(substring(gro_100$chrom, 4))),]
+
+# add 1 to every start position so that intervals are exclusive
+gro_50$start = gro_50$start + 1 
+gro_100$start = gro_100$start + 1 
+
+# check chromosome set
+unique(gro_50$chrom) # unique(gro_100$chrom)
+```
+```{r comment out 2}
+    #  "chr1"  "chr2"  "chr3"  "chr4"  "chr5"  "chr6"  "chr7"  "chr8"  "chr9"  "chr10" "chr11" "chr12" "chr13" "chr14" "chr15" "chr16" "chr17" "chr18" "chr19" "chr20" "chr21" "chr22" "chrX"
+```
+```{r expression continued}
+# remove chr X
+gro_50=gro_50[which(gro_50$chrom!="chrX"),]
+dim(gro_50) # 57509     4
+gro_100=gro_100[which(gro_100$chrom!="chrX"),]
+dim(gro_100) # 28760     4
+```
+\normalsize
+
+### Distribution of Expression data
+Do the distributions of 50kb and 100 kb windows overlap?
+\footnotesize
+```{r plot and norm test expression ,fig.width=5,fig.height=5}
+hist(log10(gro_50$expression),
+     breaks=c(seq(0,5.1,0.1)),
+     main="histogramm of nascent expression values per bin",
+     xlab="log10(expression)",
+     xlim=c(0,max(max(log10(gro_50$expression)),max(log10(gro_100$expression)))),
+     col=adjustcolor("orange",alpha.f = 0.3))
+hist(log10(gro_100$expression),
+     breaks=c(seq(0,6.1,0.1)),
+     col=adjustcolor("mediumorchid4",alpha.f = 0.3),
+     add=T)
+legend("topleft",fill=c(adjustcolor("orange",alpha.f = 0.3),adjustcolor("mediumorchid4",alpha.f = 0.3)),legend=c("50kb","100kb"),bty="n")
+
+### test if this holds statistically
+# devide 100kb values in half, double them in size, see if distributions fit 
+# (they must deviate at some point a bit, but should be the same distribution)
+halved100=rep(gro_100$expression/2,times=2)
+halved100[which(halved100>0 & halved100<1)]=1
+```
+```{r comment out 3, include=FALSE,eval=FALSE}
+# hist(log10(halved100),
+#      breaks=c(seq(0,6.1,0.1)),
+#      col=adjustcolor("blue",alpha.f = 0.3),
+#      add=T)
+# almost, looking ok
+
+t.test(gro_50$expression,gro_100$expression)
+# 	Welch Two Sample t-test
+# 
+# data:  gro_50$expression and gro_100$expression
+# t = -43.878, df = 38655, p-value < 2.2e-16
+# alternative hypothesis: true difference in means is not equal to 0
+# 95 percent confidence interval:
+#  -2271.589 -2077.323
+# sample estimates:
+# mean of x mean of y 
+#  2175.253  4349.709 
+t.test(gro_50$expression,halved100)
+# 	Welch Two Sample t-test
+# 
+# data:  gro_50$expression and halved100
+# t = 0.015994, df = 112650, p-value = 0.9872
+# alternative hypothesis: true difference in means is not equal to 0
+# 95 percent confidence interval:
+#  -48.21746  49.01085
+# sample estimates:
+# mean of x mean of y 
+#  2175.253  2174.856
+
+```
+```{r expression plots and test continued}
+t.test(gro_50$expression,gro_100$expression)
+# As expected, the 50kb and 100kb data differ significantly, but let's compare fair:
+
+t.test(gro_50$expression,halved100)
+# The distributions do not differ.
+```
+\normalsize
+
+Yes, they do overlap and do not significantly differ. This was expected as both the 50kb values as well as 100kb values were derived from the same data. The distribution looks bimodal. Does the expression data follow a normal distribution?
+\footnotesize
+```{r expression data normal distribution, fig.width=8,fig.height=8}
+library("rstatix")
+require("gridExtra")
+library("ggplot2")
+library("ggpubr")
+### check if normal distribution criterium is met ------------------------------
+# visual inspection
+# density plot
+p1 =ggdensity(gro_50$expression, fill = "lightgray")
+p2 =ggdensity(gro_100$expression, fill = "lightgray")
+# qqplot
+p3 =ggqqplot(gro_50$expression)
+p4 =ggqqplot(gro_100$expression)
+grid.arrange(p1, p2, p3, p4, ncol=2)
+
+# visual inspection suggests no normal distribution, 
+# both resolutions don't really look like it, let's test it
+
+# There are several methods to evaluate normality, including the Kolmogorov-Smirnov
+# normality test and the Shapiro-Wilk’s test. The null hypothesis of these tests 
+# is that the “sample distribution is normal”. 
+# If the test is significant, the distribution is non-normal.
+# Shapiro-Wilk’s method is widely recommended for normality test and it provides 
+# better power than K-S. It is based on the correlation between the data and the 
+# corresponding normal scores (Ghasemi and Zahediasl 2012).
+
+# comp_gro100_red %>% shapiro_test(expression)
+# Error: Problem with `mutate()` input `data`.
+# x sample size must be between 3 and 5000
+# nrow(comp_gro100_red) # 23498
+# table(comp_gro100_red$combined_comp)
+#   AA   AB   BB 
+# 7696 9414 6388 
+# not even every single group has less than 5000 entries
+# ok I  need to sample from the whole
+set.seed(1)
+reduced1=sample(gro_50$expression,5000,replace=F)
+shapiro.test(reduced1)
+
+set.seed(5000)
+reduced2=sample(gro_50$expression,5000,replace=F)
+shapiro.test(reduced2)
+
+set.seed(2992)
+reduced3=sample(gro_50$expression,5000,replace=F)
+shapiro.test(reduced3)
+
+set.seed(1)
+reduced1=sample(gro_100$expression,5000,replace=F)
+shapiro.test(reduced1)
+
+set.seed(5000)
+reduced2=sample(gro_100$expression,5000,replace=F)
+shapiro.test(reduced2)
+
+set.seed(2992)
+reduced3=sample(gro_100$expression,5000,replace=F)
+shapiro.test(reduced3)
+
+# tried both sets 3 times, all times with highly significant results, 
+# this data not normally distributed (in line with the visual inspection)
+```
+```{r comment out 4, include=FALSE,eval=FALSE}
+
+set.seed(1)
+reduced1=sample(gro_50$expression,5000,replace=F)
+shapiro.test(reduced1)
+# 	Shapiro-Wilk normality test
+# data:  reduced1
+# W = 0.55, p-value < 2.2e-16
+set.seed(5000)
+reduced2=sample(gro_50$expression,5000,replace=F)
+shapiro.test(reduced2)
+# 	Shapiro-Wilk normality test
+# data:  reduced2
+# W = 0.55626, p-value < 2.2e-16
+set.seed(2992)
+reduced3=sample(gro_50$expression,5000,replace=F)
+shapiro.test(reduced3)
+# 	Shapiro-Wilk normality test
+# data:  reduced3
+# W = 0.50859, p-value < 2.2e-16
+
+set.seed(1)
+reduced1=sample(gro_100$expression,5000,replace=F)
+shapiro.test(reduced1)
+# 	Shapiro-Wilk normality test
+# data:  reduced1
+# W = 0.60433, p-value < 2.2e-16
+set.seed(5000)
+reduced2=sample(gro_100$expression,5000,replace=F)
+shapiro.test(reduced2)
+# 	Shapiro-Wilk normality test
+# data:  reduced2
+# W = 0.61946, p-value < 2.2e-16
+set.seed(2992)
+reduced3=sample(gro_100$expression,5000,replace=F)
+shapiro.test(reduced3)
+# 	Shapiro-Wilk normality test
+# data:  reduced3
+# W = 0.58981, p-value < 2.2e-16
+
+```
+
+\normalsize
+No, the expression data is not normally distributed.
+
+# Combine compartment data with nascent expression data
+Let's see if the expression diffes between the called compartment levels "AA", "AB" and "BB". First, combine the datasets.
+\footnotesize
+```{r combine compartments and gro seq,eval=TRUE,include=TRUE}
+require(data.table)
+comp_dt=as.data.table(comp)
+gro_50_dt=as.data.table(gro_50)
+setkey(gro_50_dt, chrom, start, end)
+comp_gro50=foverlaps(comp_dt, gro_50_dt, type="any", mult="all") # , minoverlap=2 not yet implemented
+
+gro_100_dt=as.data.table(gro_100)
+setkey(gro_100_dt, chrom, start, end)
+comp_gro100=foverlaps(comp_dt, gro_100_dt, type="any", mult="all") 
+```
+\normalsize
+
+```{r saved on cluster,eval=FALSE,include=FALSE}
+# saveRDS(comp_gro50,"/fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/results/comp_gro50.rds")
+# saveRDS(comp_gro100,"/fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/results/comp_gro100.rds")
+# scp bih:/fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/results/comp_gro50.rds /Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro50.rds
+# scp bih:/fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/results/comp_gro100.rds /Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro100.rds
+# comp_gro50 = readRDS("/Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro50.rds")
+# comp_gro100 = readRDS("/Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro100.rds")
+
+ # saveRDS(comp_gro50,"/Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro50.rds")
+ # saveRDS(comp_gro100,"/Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro100.rds")
+```
+
+## 50kb expression bin
+\footnotesize
+```{r boxplot expression 50kb according to compartments,fig.width=8,fig.height=5,eval=TRUE,include=TRUE}
+library("ggsignif")
+comp_gro50_red=comp_gro50[,c("expression","combined_comp")]
+par(mfrow=c(1,2),oma = c(0, 0, 2, 0),par(mar=c(4,4,0.1,0.1)))#bltr margins
+boxplot(comp_gro50_red$expression~comp_gro50_red$combined_comp, 
+        outline=F,
+        col=c("limegreen","lightskyblue2","maroon"),
+        main="",
+        ylab="expression",
+        xlab="compartment") 
+# boojachacka, that's waht we were looking for
+# plot log10values for better visualization
+boxplot(log10(comp_gro50_red$expression)~comp_gro50_red$combined_comp, 
+        outline=F,
+        col=c("limegreen","lightskyblue2","maroon"),
+        main="",
+        ylab="log10(expression)",
+        xlab="compartment") 
+mtext("Nascent expression (50kb) in active and inactive compartments", outer = TRUE, cex = 1.2)
+
+comp_gro50_red$col=c("limegreen","lightskyblue2","maroon")[comp_gro50_red$combined_comp]
+my_comparisons <- list( c("AA", "AB"), c("AA", "BB"), c("AB", "BB"))
+
+gp50 = ggplot(comp_gro50_red, aes(x=combined_comp, y=expression,fill=col)) + ylab("Expression") + xlab("Compartment Level") + 
+geom_violin(outlier.shape = NA) + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons) 
+
+gp50log = ggplot(comp_gro50_red, aes(x=combined_comp, y=log10(expression),fill=col)) +  ylab("log10(Expression)") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+grid.arrange(gp50, gp50log, ncol=2)
+
+# gp50log1 = ggplot(comp_gro50_red, aes(x=combined_comp, y=log10(expression+1),fill=col)) +  ylab("log10(Nascent Expression)") + xlab("Compartment Level") + geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons,label="p.signif")
+# grid.arrange(gp50log, gp50log1, ncol=2)
+
+```
+\normalsize
+
+## 100kb expression bin
+\footnotesize
+```{r boxplot expression 100kb according to compartments,fig.width=8,fig.height=5,eval=TRUE,include=TRUE}
+comp_gro100_red=comp_gro100[,c("expression","combined_comp")]
+par(mfrow=c(1,2),oma = c(0, 0, 2, 0),par(mar=c(4,4,0.1,0.1)))#bltr margins
+boxplot(comp_gro100_red$expression~comp_gro100_red$combined_comp, 
+        outline=F,
+        col=c("limegreen","lightskyblue2","maroon"),
+        main="",
+        ylab="expression",
+        xlab="compartment") 
+boxplot(log10(comp_gro100_red$expression)~comp_gro100_red$combined_comp, 
+        outline=F,
+        col=c("limegreen","lightskyblue2","maroon"),
+        main="",
+        ylab="log10(expression)",
+        xlab="compartment") 
+mtext("Nascent expression (100kb) in active and inactive compartments", outer = TRUE, cex = 1.2)
+
+comp_gro100_red$col=c("limegreen","lightskyblue2","maroon")[comp_gro100_red$combined_comp]
+my_comparisons <- list( c("AA", "AB"), c("AA", "BB"), c("AB", "BB"))
+
+gp100 = ggplot(comp_gro100_red, aes(x=combined_comp, y=expression,fill=col)) + ylab("Expression") + xlab("Compartment Level") + 
+geom_violin(outlier.shape = NA) + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons) 
+
+gp100log = ggplot(comp_gro100_red, aes(x=combined_comp, y=log10(expression),fill=col)) +  ylab("log10(Expression)") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+grid.arrange(gp100, gp100log, ncol=2)
+
+# gp100log1 = ggplot(comp_gro100_red, aes(x=combined_comp, y=log10(expression+1),fill=col)) +  ylab("log10(Nascent Expression)") + xlab("Compartment Level") + geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons,label="p.signif")
+# grid.arrange(gp100log, gp100log1, ncol=2)
+
+# pdf("/Users/jmarkow/Desktop/GAM/Co-Phasing/biological_validation_gro_seq_50kb_100kb_log.pdf",height=6,width=10)
+# grid.arrange(gp50log1, gp100log1, ncol=2)#(0, 0.0001, 0.001, 0.01, 0.05, 1), symbols = c("****", "***", "**", "*", "ns")).
+# dev.off() 
+
+```
+\normalsize
+
+## Additional Significance test...
+...just to be sure the correct test was chosen, as we have confirmed before, that the expression data is not normally distributed. Thus, use Kruskal-Wallis test by rank to test if the observed differences are significant. Here is the thought process:
+We have 3 groups, all based on one single grouping variable. That means, we use either the one-way analysis of variance (ANOVA), also known as one-factor ANOVA, as it describes an extension of independent two-samples t-test for comparing means in a situation where there are more than two groups; or the Kruskal-Wallis test by rank, a non-parametric alternative to one-way ANOVA test, which extends the two-samples Wilcoxon test in the situation where there are more than two groups. It’s recommended when the assumptions of one-way ANOVA test are not met. As we know that the normal distribution assumptions of ANOVA are nto met in this case, I chose to use the Kruskal-Wallis test.
+\footnotesize
+```{r significance test,eval=TRUE,include=TRUE}
+# Kruskal-Wallis test by rank is a non-parametric alternative to one-way ANOVA test, 
+# which extends the two-samples Wilcoxon test in the situation where there are more 
+# than two groups. It’s recommended when the assumptions of one-way ANOVA test are not met.
+
+kruskal.test(expression ~ combined_comp, data = comp_gro100_red)
+# As the p-value is less than the significance level 0.05, we can conclude that
+# there are significant differences between the treatment groups.
+# From the output of the Kruskal-Wallis test, we know that there is a significant
+# difference between groups, but we don’t know which pairs of groups are different.
+# It’s possible to use the function pairwise.wilcox.test() to calculate pairwise 
+# comparisons between group levels with corrections for multiple testing.
+
+pairwise.wilcox.test(comp_gro50_red$expression, comp_gro50_red$combined_comp,p.adjust.method = "BH")
+# those numers are not identical to the calculations done using ggplot, but the result 
+# is the same, all comparisons are significant for the 50kb resolution.
+
+pairwise.wilcox.test(comp_gro100_red$expression, comp_gro100_red$combined_comp,p.adjust.method = "BH")
+# those numers are not identical to the calculations done using ggplot, but the result 
+# is the same, all comparisons are significant for the 100kb resolution as well.
+
+pairwise.wilcox.test(log10(comp_gro100_red$expression), comp_gro100_red$combined_comp,p.adjust.method = "BH")
+# The results hold true with log transformation.
+# The results are in line with the ggplot results.
+```
+```{r comment out 5, include=FALSE,eval=FALSE}
+
+kruskal.test(expression ~ combined_comp, data = comp_gro100_red)
+    # 	Kruskal-Wallis rank sum test
+    # 
+    # data:  expression by combined_comp
+    # Kruskal-Wallis chi-squared = 170.39, df = 2, p-value < 2.2e-16
+
+# As the p-value is less than the significance level 0.05, we can conclude that
+# there are significant differences between the treatment groups.
+# From the output of the Kruskal-Wallis test, we know that there is a significant
+# difference between groups, but we don’t know which pairs of groups are different.
+# It’s possible to use the function pairwise.wilcox.test() to calculate pairwise 
+# comparisons between group levels with corrections for multiple testing.
+
+pairwise.wilcox.test(comp_gro50_red$expression, comp_gro50_red$combined_comp,p.adjust.method = "BH")
+    # 
+    # 	Pairwise comparisons using Wilcoxon rank sum test 
+    # 
+    # data:  comp_gro50_red$expression and comp_gro50_red$combined_comp 
+    # 
+    #    AA      AB     
+    # AB < 2e-16 -      
+    # BB < 2e-16 4.3e-05
+    # 
+    # P value adjustment method: BH 
+
+# those numers are not identical to the calculations done using ggplot, but the result 
+# is the same, all comparisons are significant for the 50kb resolution.
+
+pairwise.wilcox.test(comp_gro100_red$expression, comp_gro100_red$combined_comp,p.adjust.method = "BH")
+    # 	Pairwise comparisons using Wilcoxon rank sum test 
+    # 
+    # data:  comp_gro100_red$expression and comp_gro100_red$combined_comp 
+    # 
+    #    AA     AB   
+    # AB <2e-16 -    
+    # BB <2e-16 0.002
+    # 
+    # P value adjustment method: BH 
+
+# those numers are not identical to the calculations done using ggplot, but the result 
+# is the same, all comparisons are significant for the 100kb resolution as well.
+
+pairwise.wilcox.test(log10(comp_gro100_red$expression), comp_gro100_red$combined_comp,p.adjust.method = "BH")
+    # 	Pairwise comparisons using Wilcoxon rank sum test 
+    # 
+    # data:  log10(comp_gro100_red$expression) and comp_gro100_red$combined_comp 
+    # 
+    #    AA     AB   
+    # AB <2e-16 -    
+    # BB <2e-16 0.002
+    # 
+    # P value adjustment method: BH
+# The results hold true with log transformation.
+
+# The results are in line with the ggplot results.
+
+```
+\normalsize
+
+## Are the different expression distributions overlapping?
+\footnotesize
+```{r distributions overlapping,fig.width=8,fig.height=5,eval=TRUE,include=TRUE}
+par(mfrow=c(1,2),oma = c(0, 0, 2, 0),par(mar=c(4,4,0.1,0.1)))#bltr margins
+hist(log10(comp_gro50_red$expression[which(comp_gro50_red$combined_comp=="AB")]),breaks = seq(0,6.1,0.1),col=adjustcolor("lightskyblue2",alpha.f=0.4),
+     main="",
+     xlab="log10(expression) - 50kb")
+hist(log10(comp_gro50_red$expression[which(comp_gro50_red$combined_comp=="AA")]),breaks = seq(0,6.1,0.1),col=adjustcolor("limegreen",alpha.f=0.4),add=T)
+hist(log10(comp_gro50_red$expression[which(comp_gro50_red$combined_comp=="BB")]),breaks = seq(0,6.1,0.1),col=adjustcolor("maroon",alpha.f=0.4),add=T)
+legend("topleft",fill=adjustcolor(c("limegreen","lightskyblue2","maroon"),alpha.f=0.4),legend=c("AA","AB","BB"),bty="n")
+
+hist(log10(comp_gro100_red$expression[which(comp_gro100_red$combined_comp=="AB")]),breaks = seq(0,6.1,0.1),col=adjustcolor("lightskyblue2",alpha.f=0.4),
+     main="",
+     xlab="log10(expression) - 100kb")
+hist(log10(comp_gro100_red$expression[which(comp_gro100_red$combined_comp=="AA")]),breaks = seq(0,6.1,0.1),col=adjustcolor("limegreen",alpha.f=0.4),add=T)
+hist(log10(comp_gro100_red$expression[which(comp_gro100_red$combined_comp=="BB")]),breaks = seq(0,6.1,0.1),col=adjustcolor("maroon",alpha.f=0.4),add=T)
+legend("topleft",fill=adjustcolor(c("limegreen","lightskyblue2","maroon"),alpha.f=0.4),legend=c("AA","AB","BB"),bty="n")
+mtext("Histogram of nascent expression in active and inactive compartments", outer = TRUE, cex = 1.2)
+
+```
+\normalsize
+
+## Do high expression values correlate with Eigenvalues of PC1?
+\footnotesize
+```{r expression values vs compartment score,fig.width=8,fig.height=8,eval=TRUE,include=TRUE}
+par(mfrow=c(2,2),oma = c(0, 0, 2, 0),par(mar=c(4,4,0.1,0.1)))#bltr margins
+plot(x=comp_gro50$Genome1_score1,
+     y=comp_gro50$expression,pch = 19,
+     col = adjustcolor(comp_gro50_red$col,alpha.f=0.2),
+     xlab="Genome Score",
+     ylab="Expression (50kb)")
+plot(x=comp_gro100$Genome1_score1,
+     y=comp_gro100$expression,pch = 19,
+     col = adjustcolor(comp_gro100_red$col,alpha.f=0.2),
+     xlab="Genome Score",
+     ylab="Expression (100kb)")
+
+plot(x=abs(comp_gro50$Genome1_score1),
+     y=comp_gro50$expression,pch = 19,cex=0.5,
+     col = adjustcolor("black",alpha.f=0.1),
+     xlab="Absolute Genome Score",
+     ylab="Expression (50kb)")
+plot(x=abs(comp_gro100$Genome1_score1),
+     y=comp_gro100$expression,pch = 19,cex=0.5,
+     col = adjustcolor("black",alpha.f=0.1),
+     xlab="Absolute Genome Score",
+     ylab="Expression (100kb)")
+mtext("Genome Score vs intensity of nascent expression", outer = TRUE, cex = 1.2)
+```
+\normalsize
+Expression values are higher with lower Eigenvalues. This was unexpected to me, in case there would be arelationship, I expected strong negative values to correlate with low expression and high positive values to correlate with high expression.
+\footnotesize
+```{r expression values vs compartment score try outs,eval=FALSE,include=FALSE}
+# lines(lowess(comp_gro100$Genome1_score1, log10(comp_gro100$expression)), col=2)
+# lines(lowess(comp_gro100$Genome1_score1, log10(comp_gro100$expression), f=.2), col=3)
+# plot(x=comp_gro100$Genome1_score1[which(comp_gro100$combined_comp=="AA" | comp_gro100$combined_comp=="BB")],
+#      y=comp_gro100$expression[which(comp_gro100$combined_comp=="AA" | comp_gro100$combined_comp=="BB")],
+#      pch = 19, cex=0.5,
+#      col = adjustcolor(c("limegreen","lightskyblue2","maroon")[comp_gro100$combined_comp[which(comp_gro100$combined_comp=="AA" | comp_gro100$combined_comp=="BB")]],alpha.f=0.2))
+# plot(x=comp_gro100$Genome1_score1[which(comp_gro100$combined_comp=="AB")],
+#      y=comp_gro100$expression[which(comp_gro100$combined_comp=="AB")],
+#      pch = 19, cex=0.5,
+#      col = adjustcolor(c("limegreen","lightskyblue2","maroon")[comp_gro100$combined_comp[which(comp_gro100$combined_comp=="AB")]],alpha.f=0.2))
+# lines(lowess(abs(comp_gro100$Genome1_score1), comp_gro100$expression), col=2)
+# lines(lowess(abs(comp_gro100$Genome1_score1), comp_gro100$expression, f=.2), col=3)
+# plot(x=abs(comp_gro100$Genome1_score1),
+#      y=log10(comp_gro100$expression),
+#      pch = 19,cex=0.5,
+#      col = adjustcolor("black",alpha.f=0.1))
+
+# triewd to fit stuff, but nah
+# lines(lowess(abs(comp_gro100$Genome1_score1), log10(comp_gro100$expression)), col=2)
+# lines(lowess(abs(comp_gro100$Genome1_score1), log10(comp_gro100$expression), f=.2), col=3)
+# 
+# fit <- lm(comp_gro100$expression ~ poly(abs(comp_gro100$Genome1_score1), 3))   ## polynomial of degree 3
+# x0 <- seq(min(abs(comp_gro100$Genome1_score1)), max(abs(comp_gro100$Genome1_score1)), length = length(comp_gro100$Genome1_score1))  ## prediction grid
+# y0 <- predict.lm(fit, newdata = list(x = x0))  ## predicted values
+# lines(x0, y0, col = 2)  
+
+```
+\normalsize
+
+# Fazit
+
+Here I could show, that the haplotype-specific H1 chromatin contact maps generated with the Co-phasing approach using hard distance cut offs between observed SNVs and reads, produce biologically meaningful resutls, as genomic regions active in both homologous chromosomes show significantly higher expression levels compared to regions which are active in one and inactive in the other homologous chromosome, while regions which are inactive in both show the lowest expression level.
+
+```{r gene expression,eval=FALSE,include=FALSE}
+gene_exp=read.csv("/Users/jmarkow/Desktop/GAM/Co-Phasing/data/expression_data/genes_with_expression.bed",header = T, sep="\t")
+### preprocess -----------------------------------------------------------------
+# correct colnames
+colnames(gene_exp)[1]="chrom"
+# check size
+dim(gene_exp) # 60725     9
+
+# check chromosome set
+unique(gene_exp$chrom) 
+red_chrom_set=paste("chr",1:22,sep='')
+gene_exp=gene_exp[which(gene_exp$chrom%in%red_chrom_set),]
+dim(gene_exp) # 57439     9
+# sort by chromosome and position
+gene_exp = gene_exp[order(gene_exp$start),]
+gene_exp = gene_exp[order(as.numeric(substring(gene_exp$chrom, 4))),]
+gene_exp$chrom = factor(gene_exp$chrom, levels = red_chrom_set)
+### explore --------------------------------------------------------------------
+table(gene_exp$gene_type)/nrow(gene_exp)*100
+> length(unique(comp_gene_exp_pt$gene_id))
+[1] 15882
+```
+```{r comment out gene expression, eval=FALSE, include=FALSE}
+ #          3prime_overlapping_ncrna                          antisense      bidirectional_promoter_lncrna                          IG_C_gene 
+ #                       0.048747367                        9.488326747                        0.005222932                        0.024373683 
+ #                   IG_C_pseudogene                          IG_D_gene                          IG_J_gene                    IG_J_pseudogene 
+ #                       0.015668796                        0.064416163                        0.031337593                        0.005222932 
+ #                         IG_V_gene                    IG_V_pseudogene                            lincRNA                       macro_lncRNA 
+ #                       0.252441721                        0.318598861                       13.010323996                        0.001740977 
+ #                             miRNA                           misc_RNA                            Mt_rRNA                            Mt_tRNA 
+ #                       6.667943383                        3.809258518                        0.000000000                        0.000000000 
+ #                        non_coding             polymorphic_pseudogene               processed_pseudogene               processed_transcript 
+ #                       0.005222932                        0.099235711                       16.400006964                        0.854819896 
+ #                    protein_coding                         pseudogene                           ribozyme                               rRNA 
+ #                      32.916659413                        0.031337593                        0.013927819                        0.894862376 
+ #                            scaRNA                     sense_intronic                  sense_overlapping                             snoRNA 
+ #                       0.083566914                        1.566879646                        0.325562771                        1.566879646 
+ #                             snRNA                               sRNA                                TEC                          TR_C_gene 
+ #                       3.125054406                        0.034819548                        1.808875503                        0.010445864 
+ #                         TR_D_gene                          TR_J_gene                    TR_J_pseudogene                          TR_V_gene 
+ #                       0.006963910                        0.137537213                        0.006963910                        0.188025558 
+ #                   TR_V_pseudogene   transcribed_processed_pseudogene     transcribed_unitary_pseudogene transcribed_unprocessed_pseudogene 
+ #                       0.052229322                        0.748620275                        0.005222932                        1.103779662 
+ # translated_unprocessed_pseudogene                 unitary_pseudogene             unprocessed_pseudogene                           vaultRNA 
+ #                       0.001740977                        0.290743223                        3.974651369                        0.001740977 
+```
+```{r gene expression continued}
+# only a third is protein coding, 16% processed_pseudogene, 13% is lincRNA, 9% antisense
+hist(log10(gene_exp$pme_TPM),breaks=seq(-2,5,0.1),col=adjustcolor("red",alpha.f = 0.3))
+hist(log10(gene_exp$TPM),breaks=seq(-2,5,0.1),col=adjustcolor("grey",alpha.f = 0.3),add=TRUE)
+# the posterior mean estimates are calculated using the Collapsed Gibbs sampler 
+# Based on inputs from ENCODE, it seems the pme_TPM works best for within sample comparison. (https://github.com/deweylab/RSEM/issues/15)
+gene_exp$pme_TPM_diff=abs(gene_exp$pme_TPM-gene_exp$TPM)
+gene_exp$pme_TPM_diff_percent=abs(gene_exp$pme_TPM-gene_exp$TPM)/pmax(gene_exp$pme_TPM,gene_exp$TPM)*100
+# hist(gene_exp$pme_TPM_diff)
+# hist(gene_exp$pme_TPM_diff_percent)
+par(mfrow=c(2,2))
+hist(log10(gene_exp$pme_TPM[which(gene_exp$gene_type=="protein_coding")]),breaks=seq(-2,5,0.1),col=adjustcolor("red",alpha.f = 0.3),main="protein_coding")
+hist(log10(gene_exp$TPM[which(gene_exp$gene_type=="protein_coding")]),breaks=seq(-2,5,0.1),col=adjustcolor("grey",alpha.f = 0.3),add=TRUE)
+hist(log10(gene_exp$pme_TPM[which(gene_exp$gene_type=="lincRNA")]),breaks=seq(-2,5,0.1),col=adjustcolor("blue",alpha.f = 0.3),main="lincRNA")
+hist(log10(gene_exp$TPM[which(gene_exp$gene_type=="lincRNA")]),breaks=seq(-2,5,0.1),col=adjustcolor("grey",alpha.f = 0.3),add=TRUE)
+hist(log10(gene_exp$pme_TPM[which(gene_exp$gene_type=="antisense")]),breaks=seq(-2,5,0.1),col=adjustcolor("green",alpha.f = 0.3),main="antisense")
+hist(log10(gene_exp$TPM[which(gene_exp$gene_type=="antisense")]),breaks=seq(-2,5,0.1),col=adjustcolor("grey",alpha.f = 0.3),add=TRUE)
+hist(log10(gene_exp$pme_TPM[which(gene_exp$gene_type=="processed_pseudogene")]),breaks=seq(-2,5,0.1),col=adjustcolor("gold",alpha.f = 0.3),main="processed_pseudogene")
+hist(log10(gene_exp$TPM[which(gene_exp$gene_type=="processed_pseudogene")]),breaks=seq(-2,5,0.1),col=adjustcolor("grey",alpha.f = 0.3),add=TRUE)
+par(mfrow=c(1,1),mar = c(4.1, 16.1, 3.1, 0.1)) # change the margins #bltr 
+# pme TPM
+boxplot(gene_exp$pme_TPM~gene_exp$gene_type,horizontal=TRUE,outline=TRUE,las=2,xlab="gene expression in pme TPM ",main="without outliers") #ylab="gene type",
+boxplot(gene_exp$pme_TPM~gene_exp$gene_type,horizontal=TRUE,outline=FALSE,las=2,xlab="gene expression in pme TPM ",main="including outliers") #ylab="gene type",
+boxplot(log10(gene_exp$pme_TPM)~gene_exp$gene_type,horizontal=TRUE,outline=FALSE,las=2,xlab="log10(gene expression in pme TPM)",main="without outliers")
+boxplot(log10(gene_exp$pme_TPM+1)~gene_exp$gene_type,horizontal=TRUE,outline=FALSE,las=2,xlab="log10(gene expression in pme TPM +1)",main="without outliers")
+boxplot(log10(gene_exp$pme_TPM)~gene_exp$gene_type,horizontal=TRUE,outline=TRUE,las=2,xlab="log10(gene expression in pme TPM)",main="including outliers")
+boxplot(log10(gene_exp$pme_TPM+1)~gene_exp$gene_type,horizontal=TRUE,outline=TRUE,las=2,xlab="log10(gene expression in pme TPM +1)",main="including outliers")
+# TPM
+boxplot(gene_exp$TPM~gene_exp$gene_type,horizontal=TRUE,outline=TRUE,las=2,xlab="gene expression in TPM ",main="without outliers") #ylab="gene type",
+boxplot(gene_exp$TPM~gene_exp$gene_type,horizontal=TRUE,outline=FALSE,las=2,xlab="gene expression in TPM ",main="including outliers") #ylab="gene type",
+boxplot(log10(gene_exp$TPM)~gene_exp$gene_type,horizontal=TRUE,outline=FALSE,las=2,xlab="log10(gene expression in TPM)",main="without outliers")
+boxplot(log10(gene_exp$TPM+1)~gene_exp$gene_type,horizontal=TRUE,outline=FALSE,las=2,xlab="log10(gene expression in TPM +1)",main="without outliers")
+boxplot(log10(gene_exp$TPM)~gene_exp$gene_type,horizontal=TRUE,outline=TRUE,las=2,xlab="log10(gene expression in TPM)",main="including outliers")
+boxplot(log10(gene_exp$TPM+1)~gene_exp$gene_type,horizontal=TRUE,outline=TRUE,las=2,xlab="log10(gene expression in TPM +1)",main="including outliers")
+
+### combine with compartments --------------------------------------------------
+gene_exp_dt=as.data.table(gene_exp)
+setkey(gene_exp_dt, chrom, start, end)
+comp_gene_exp=foverlaps(comp_dt, gene_exp_dt, type="any", mult="all") 
+dim(comp_gene_exp) # 54783    17
+
+# TPM vs compartments, all gene types
+par(mfrow=c(1,1),mar = c(4.1,4.1, 3.1, 0.1))
+boxplot(comp_gene_exp$TPM~comp_gene_exp$combined_comp)
+boxplot(comp_gene_exp$TPM~comp_gene_exp$combined_comp,outline=F) # nice
+boxplot(log10(comp_gene_exp$TPM+1)~comp_gene_exp$combined_comp)
+boxplot(log10(comp_gene_exp$TPM+1)~comp_gene_exp$combined_comp,outline=F)
+boxplot(log10(comp_gene_exp_pt$TPM+1)~comp_gene_exp_pt$combined_comp,outline=F)
+boxplot(log10(comp_gene_exp_pt$TPM+1)~comp_gene_exp_pt$combined_comp,outline=T)
+
+# pme TMP vs compartments, all gene types
+boxplot(comp_gene_exp$pme_TPM~comp_gene_exp$combined_comp)
+boxplot(comp_gene_exp$pme_TPM~comp_gene_exp$combined_comp,outline=F) # nice
+boxplot(log10(comp_gene_exp$pme_TPM+1)~comp_gene_exp$combined_comp)
+boxplot(log10(comp_gene_exp$pme_TPM+1)~comp_gene_exp$combined_comp,outline=F)
+
+# TPM vs compartments, protein coding
+comp_gene_exp_pt=comp_gene_exp[which(comp_gene_exp$gene_type=="protein_coding"),]
+dim(comp_gene_exp) #[1] 54783    17
+dim(comp_gene_exp_pt) #[1] 21242    17
+par(mfrow=c(1,1),mar = c(4.1,4.1, 3.1, 0.1))
+# boxplot(comp_gene_exp_pt$TPM~comp_gene_exp_pt$combined_comp)
+boxplot(comp_gene_exp_pt$TPM~comp_gene_exp_pt$combined_comp,outline=F) # nice
+# boxplot(log10(comp_gene_exp_pt$TPM+1)~comp_gene_exp_pt$combined_comp)
+# boxplot(log10(comp_gene_exp_pt$TPM+1)~comp_gene_exp_pt$combined_comp,outline=F)
+# pme TMP vs compartments, protein coding
+# boxplot(comp_gene_exp_pt$pme_TPM~comp_gene_exp_pt$combined_comp)
+boxplot(comp_gene_exp_pt$pme_TPM~comp_gene_exp_pt$combined_comp,outline=F,notch=T) # nice
+# boxplot(log10(comp_gene_exp_pt$pme_TPM+1)~comp_gene_exp_pt$combined_comp)
+# boxplot(log10(comp_gene_exp_pt$pme_TPM+1)~comp_gene_exp_pt$combined_comp,outline=F)
+
+# violin plot
+comp_gene_exp$col=c("limegreen","lightskyblue2","maroon")[comp_gene_exp$combined_comp]
+comp_gene_exp_pt$col=c("limegreen","lightskyblue2","maroon")[comp_gene_exp_pt$combined_comp]
+my_comparisons <- list( c("AA", "AB"), c("AA", "BB"), c("AB", "BB"))
+
+# all gene types, tpm, log10(tpm), pme_tpm, log10(pme_tpm)
+ggplot(comp_gene_exp, aes(x=combined_comp, y=TPM,fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons)
+
+ggplot(comp_gene_exp, aes(x=combined_comp, y=log10(TPM),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons)
+
+ggplot(comp_gene_exp, aes(x=combined_comp, y=log10(TPM+1),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons, method="wilcox.test")#label="p.signif" #t.test, wilcox.test, anova, kruskal.test, kruskal.test
+# known problem, that the test results in ggplot do not fit the test results computed outside
+#ggplot(test, aes(x=c2, y=c1)) +
+gexlog1=ggplot(comp_gene_exp, aes(x=combined_comp, y=log10(TPM+1),fill=col)) +  ylab(" log10(Gene Expression)") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test",label="p.signif")
+  # geom_text(aes(label = glue::glue("p = {pval_fmt}")), 
+  #           data = c(0.0017,6.6e-09,0.0018))
+
+# trying to visualize the gene expression better
+hist(comp_gene_exp$TPM[comp_gene_exp$combined_comp=="AA"])
+hist(log10(comp_gene_exp$TPM[comp_gene_exp$combined_comp=="AA"]+1),breaks=100,col="limegreen")
+hist(log10(comp_gene_exp$TPM[comp_gene_exp$combined_comp=="AB"]+1),breaks=100,col=adjustcolor("lightskyblue2",alpha.f = 0.3),add=T)
+hist(log10(comp_gene_exp$TPM[comp_gene_exp$combined_comp=="BB"]+1),breaks=100,col=adjustcolor("maroon",alpha.f = 0.3),add=T)
+
+hist(log10(comp_gene_exp$TPM[comp_gene_exp$combined_comp=="AA"]),breaks=100,col="limegreen")
+hist(log10(comp_gene_exp$TPM[comp_gene_exp$combined_comp=="AB"]),breaks=100,col=adjustcolor("lightskyblue2",alpha.f = 0.3),add=T)
+hist(log10(comp_gene_exp$TPM[comp_gene_exp$combined_comp=="BB"]),breaks=100,col=adjustcolor("maroon",alpha.f = 0.3),add=T)
+
+comp_gene_exp_only_genes=comp_gene_exp[which(!(is.na(comp_gene_exp$TPM))),]
+comp_gene_exp_AA=comp_gene_exp_only_genes[comp_gene_exp_only_genes$combined_comp=="AA",]
+comp_gene_exp_AB=comp_gene_exp_only_genes[comp_gene_exp_only_genes$combined_comp=="AB",]
+comp_gene_exp_BB=comp_gene_exp_only_genes[comp_gene_exp_only_genes$combined_comp=="BB",]
+# par(mfrow=c(3,1))
+# plot(density(log10(comp_gene_exp_AA$TPM+1)))
+# plot(density(log10(comp_gene_exp_AB$TPM+1)))
+par(mfrow=c(2,1))
+plot(density(log10(comp_gene_exp_BB$TPM+1)),col="maroon")
+lines(density(log10(comp_gene_exp_AB$TPM+1)),col="lightskyblue2")
+lines(density(log10(comp_gene_exp_AA$TPM+1)),col="limegreen")
+
+plot(density(log10(comp_gene_exp_BB$TPM[comp_gene_exp_BB$TPM>1])),col="maroon")
+lines(density(log10(comp_gene_exp_AB$TPM[comp_gene_exp_AB$TPM>1])),col="lightskyblue2")
+lines(density(log10(comp_gene_exp_AA$TPM[comp_gene_exp_AA$TPM>1])),col="limegreen")
+#this does not look like there is a difference in expressed genes at all -.-
+
+
+    kruskal.test(TPM ~ combined_comp, data = comp_gene_exp_only_genes)
+    # data:  TPM by combined_comp
+    # Kruskal-Wallis chi-squared = 15.655, df = 2, p-value = 0.0003985
+
+    pairwise.wilcox.test(comp_gene_exp_only_genes$TPM, comp_gene_exp_only_genes$combined_comp,p.adjust.method = "BH")
+    #    AA      AB     
+    # AB 0.00363 -      
+    # BB 0.00065 0.33507
+    
+    pairwise.wilcox.test(log10(comp_gene_exp_only_genes$TPM), comp_gene_exp_only_genes$combined_comp,p.adjust.method = "BH")
+    #        AA      AB    
+    # AB 0.0017  -     
+    # BB 6.6e-09 0.0018
+    pairwise.wilcox.test(log10(comp_gene_exp_only_genes$TPM+1), comp_gene_exp_only_genes$combined_comp,p.adjust.method = "BH")
+    #    AA      AB     
+    # AB 0.00363 -      
+    # BB 0.00065 0.33507
+    
+boxplot(log10(comp_gene_exp_only_genes$TPM+1)~comp_gene_exp_only_genes$combined_comp)
+boxplot(log10(comp_gene_exp_only_genes[comp_gene_exp_only_genes$TPM>1,]$TPM+1)~comp_gene_exp_only_genes[comp_gene_exp_only_genes$TPM>1,]$combined_comp)
+
+# plot(density(comp_gene_exp_BB$TPM[comp_gene_exp_BB$TPM>1]),col="maroon")
+# lines(density(comp_gene_exp_AB$TPM[comp_gene_exp_AB$TPM>1]),col="lightskyblue2")
+# lines(density(comp_gene_exp_AA$TPM[comp_gene_exp_AA$TPM>1]),col="limegreen")
+
+pdf("/Users/jmarkow/Desktop/GAM/Co-Phasing/biological_validation.pdf",height=6,width=10)
+grid.arrange(gp50log1, gexlog1, ncol=2) #(0, 0.0001, 0.001, 0.01, 0.05, 1), symbols = c("****", "***", "**", "*", "ns")).
+dev.off() # this plot did not show the correct significante levels, as ggplot is not capable to calculate the correct text metrics, I loaded this file into ilustrator to correct the significance levels according to the pairwise.wilcox.test
+
+    kruskal.test(TPM ~ comp, data = qw)
+    pairwise.wilcox.test(log10(qw$TPM), qw$comp,p.adjust.method = "BH")
+    
+    kruskal.test(TPM ~ combined_comp, data = comp_gene_exp)
+    pairwise.wilcox.test(log10(comp_gene_exp$TPM), comp_gene_exp$combined_comp,p.adjust.method = "BH") # all 3 significant
+#     data:  log10(comp_gene_exp$TPM) and comp_gene_exp$combined_comp 
+# 
+#           AA      AB    
+#    AB 0.0017  -     
+#    BB 6.6e-09 0.0018
+    pairwise.wilcox.test(log10(comp_gene_exp$TPM+1), comp_gene_exp$combined_comp,p.adjust.method = "BH") # very different
+#            AA      AB     
+#    AB 0.00363 -      
+#    BB 0.00065 0.33507
+
+comp_gene_exp$log10_TPM=log10(comp_gene_exp$TPM)
+head(unique(sort(comp_gene_exp$log10_TPM)))
+comp_gene_exp$log10_TPM[which(comp_gene_exp$log10_TPM<(-3))]=-5
+any(is.na(comp_gene_exp$log10_TPM))
+natpm=which(is.na(comp_gene_exp$log10_TPM))
+head(comp_gene_exp[natpm,])
+
+# ggplot(comp_gene_exp, aes(x=combined_comp, y=log10_TPM,fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+# geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+# stat_compare_means(comparisons = my_comparisons)
+
+comp_gene_exp_wona=comp_gene_exp[which(!is.na(comp_gene_exp$start)),]
+table(is.na(comp_gene_exp$start))
+# FALSE  TRUE 
+# 54151   632 
+# doesn't change anything, nas were removed before as well
+ggplot(comp_gene_exp_wona, aes(x=combined_comp, y=log10(TPM+1),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons, method="wilcox.test") 
+    pairwise.wilcox.test(log10(comp_gene_exp_wona$TPM), comp_gene_exp_wona$combined_comp,p.adjust.method = "BH") # all 3 significant, same
+#     data:  log10(comp_gene_exp_wona$TPM) and comp_gene_exp_wona$combined_comp 
+# 
+#    AA      AB    
+# AB 0.0017  -     
+# BB 6.6e-09 0.0018
+
+comp_gene_exp_tmplarger1=comp_gene_exp[comp_gene_exp$TPM>=1,]
+comp_gene_exp_tmpsmaller1=comp_gene_exp[comp_gene_exp$TPM<1,]
+
+gexlog1_tpmlarger1=ggplot(comp_gene_exp_tmplarger1, aes(x=combined_comp, y=log10(TPM+1),fill=col)) +  ylab(" log10(Gene Expression)") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+    stat_compare_means(comparisons = my_comparisons, method="wilcox.test",label="p.signif")
+   
+gexlog1_tpmsmaller1=ggplot(comp_gene_exp_tmpsmaller1, aes(x=combined_comp, y=log10(TPM+1),fill=col)) +  ylab(" log10(Gene Expression)") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+    stat_compare_means(comparisons = my_comparisons, method="wilcox.test",label="p.signif") 
+grid.arrange(gexlog1_tpmlarger1, gexlog1_tpmsmaller1, ncol=2) #(0, 0.0001, 0.001, 0.01, 0.05, 1), symbols = c("****", "***", "**", "*", "ns")).
+
+par(mfrow=c(1,2))
+boxplot(log10(comp_gene_exp_tmplarger1$TPM+1)~comp_gene_exp_tmplarger1$combined_comp)
+boxplot(log10(comp_gene_exp_tmpsmaller1$TPM+1)~comp_gene_exp_tmpsmaller1$combined_comp)
+
+par(mfrow=c(1,2))
+boxplot(comp_gene_exp_tmplarger1$TPM~comp_gene_exp_tmplarger1$combined_comp,outline=F,notch=T)
+boxplot(comp_gene_exp_tmpsmaller1$TPM~comp_gene_exp_tmpsmaller1$combined_comp,outline=F)
+
+par(mfrow=c(1,2))
+boxplot(log10(comp_gene_exp_tmplarger1$TPM+1)~comp_gene_exp_tmplarger1$combined_comp,outline=F,notch=T)
+boxplot(log10(comp_gene_exp_tmpsmaller1$TPM+1)~comp_gene_exp_tmpsmaller1$combined_comp,outline=F)
+# boxplot(log10(comp_gene_exp_pt$pme_TPM+1)~comp_gene_exp_pt$combined_comp,outline=F)
+
+comp_gene_exp_filtered=comp_gene_exp[which(!(is.na(comp_gene_exp$TPM))),]
+nrow(comp_gene_exp_filtered)
+
+table(comp_gene_exp_tmplarger1$combined_comp)/table(comp_gene_exp_filtered$combined_comp)
+table(comp_gene_exp_tmpsmaller1$combined_comp)/table(comp_gene_exp_filtered$combined_comp)
+(nrow(comp_gene_exp_tmplarger1)+nrow(comp_gene_exp_tmpsmaller1))==nrow(comp_gene_exp_filtered) #TRUE
+table(comp_gene_exp_tmplarger1$combined_comp)/table(comp_gene_exp_filtered$combined_comp) + table(comp_gene_exp_tmpsmaller1$combined_comp)/table(comp_gene_exp_filtered$combined_comp)
+
+
+
+ggplot(comp_gene_exp, aes(x=combined_comp, y=log10(TPM+0.001),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+
+    p + stat_compare_means(
+ aes(label = paste0("p = ", ..p.format..))
+)
+    
+    
+ggplot(comp_gene_exp, aes(x=combined_comp, y=log2(TPM),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+ggplot(comp_gene_exp, aes(x=combined_comp, y=log2(TPM+1),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+
+ggplot(comp_gene_exp, aes(x=combined_comp, y=pme_TPM,fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+ggplot(comp_gene_exp, aes(x=combined_comp, y=log10(pme_TPM),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+
+
+# protein coding, tpm, log10(tpm), pme_tpm, log10(pme_tpm)
+ggplot(comp_gene_exp_pt, aes(x=combined_comp, y=TPM,fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons)
+
+ggplot(comp_gene_exp_pt, aes(x=combined_comp, y=log10(TPM),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons)
+
+gexptlog1=ggplot(comp_gene_exp_pt, aes(x=combined_comp, y=log10(TPM+1),fill=col)) +  ylab(" log10(Gene Expression)") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test",label="p.signif")
+
+ggplot(comp_gene_exp_pt, aes(x=combined_comp, y=pme_TPM,fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons)
+
+ggplot(comp_gene_exp_pt, aes(x=combined_comp, y=log10(pme_TPM),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons)
+
+ggplot(comp_gene_exp_pt, aes(x=combined_comp, y=log10(pme_TPM+1),fill=col)) +  ylab(" Gene expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons)
+
+
+# gexlog1=ggplot(comp_gene_exp, aes(x=combined_comp, y=log10(TPM+1),fill=col)) +  ylab(" log10(Gene Expression)") + xlab("Compartment Level") + 
+# geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test",label="p.signif")
+pdf("/Users/jmarkow/Desktop/GAM/Co-Phasing/biological_validation_gene_exp_all_protcod.pdf",height=6,width=10)
+grid.arrange(gexlog1, gexptlog1, ncol=2) #(0, 0.0001, 0.001, 0.01, 0.05, 1), symbols = c("****", "***", "**", "*", "ns")).
+dev.off()
+
+    kruskal.test(TPM ~ combined_comp, data = comp_gene_exp_pt)
+    kruskal.test(TPM ~ combined_comp, data = comp_gene_exp)
+        pairwise.wilcox.test(comp_gene_exp_pt$TPM, comp_gene_exp_pt$combined_comp,p.adjust.method = "BH")
+        pairwise.wilcox.test(comp_gene_exp$TPM, comp_gene_exp$combined_comp,p.adjust.method = "BH")
+
+    pairwise.wilcox.test(log10(comp_gene_exp_pt$TPM), comp_gene_exp_pt$combined_comp,p.adjust.method = "BH") # all 3 significant
+        # data:  log10(comp_gene_exp_pt$TPM) and comp_gene_exp_pt$combined_comp 
+        # 
+        #    AA      AB   
+        # AB 0.005   -    
+        # BB 1.1e-06 0.010
+
+    pairwise.wilcox.test(log10(comp_gene_exp_pt$TPM+1), comp_gene_exp_pt$combined_comp,p.adjust.method = "BH")
+    
+    kruskal.test(TPM ~ combined_comp, data = comp_gene_exp_pt)
+    pairwise.wilcox.test(log10(comp_gene_exp_pt$TPM), comp_gene_exp_pt$combined_comp,p.adjust.method = "BH") # all 3 significant
+        # data:  log10(comp_gene_exp_pt$TPM) and comp_gene_exp_pt$combined_comp 
+        # 
+        #    AA      AB   
+        # AB 0.005   -    
+        # BB 1.1e-06 0.010
+
+    pairwise.wilcox.test(log10(comp_gene_exp_pt$TPM+1), comp_gene_exp_pt$combined_comp,p.adjust.method = "BH")
+        # data:  log10(comp_gene_exp_pt$TPM + 1) and comp_gene_exp_pt$combined_comp
+        # 
+        #    AA      AB
+        # AB 0.00554 -
+        # BB 0.00096 0.30499
+
+> summary(lm(I(log10(TPM+1))~I(as.numeric(combined_comp)),data=comp_gene_exp_pt))
+
+Call:
+lm(formula = I(log10(TPM + 1)) ~ I(as.numeric(combined_comp)), 
+    data = comp_gene_exp_pt)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.7292 -0.6338 -0.0789  0.4465  3.3395 
+
+Coefficients:
+                             Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   0.75286    0.01175  64.081  < 2e-16 ***
+I(as.numeric(combined_comp)) -0.02361    0.00570  -4.143 3.45e-05 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.642 on 21240 degrees of freedom
+Multiple R-squared:  0.0008073,	Adjusted R-squared:  0.0007603 
+F-statistic: 17.16 on 1 and 21240 DF,  p-value: 3.446e-05
+
+> summary(lm(I(log10(TPM+1))~combined_comp,data=comp_gene_exp_pt))
+
+Call:
+lm(formula = I(log10(TPM + 1)) ~ combined_comp, data = comp_gene_exp_pt)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.7315 -0.6346 -0.0795  0.4455  3.3435 
+
+Coefficients:
+                 Estimate Std. Error t value Pr(>|t|)    
+(Intercept)      0.731478   0.007476  97.847  < 2e-16 ***
+combined_compAB -0.029759   0.010247  -2.904  0.00369 ** 
+combined_compBB -0.046457   0.011451  -4.057 4.98e-05 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.642 on 21239 degrees of freedom
+Multiple R-squared:  0.0008318,	Adjusted R-squared:  0.0007377 
+F-statistic: 8.841 on 2 and 21239 DF,  p-value: 0.0001452
+
+
+```
+
+```{r sig,eval=FALSE,include=FALSE}
+# meeting with roland
+# how many protein coding genes do we see?
+    # whole dataset
+    length(unique(gene_exp$gene_id[which(gene_exp$gene_type=="protein_coding")])) #18907
+    # combined dataset of gene level expression and called compartments
+    length(unique(comp_gene_exp$gene_id[which(comp_gene_exp$gene_type=="protein_coding")])) #15882
+    
+# aggregate expression values over compartmens
+    # gro_50
+    q50_mean=aggregate(comp_gro50$expression,by=list(chrom=comp_gro50$chrom,i.start=comp_gro50$i.start),mean)
+    q50_sum=aggregate(comp_gro50$expression,by=list(chrom=comp_gro50$chrom,i.start=comp_gro50$i.start),sum)
+    w50=aggregate(comp_gro50$combined_comp,by=list(chrom=comp_gro50$chrom,i.start=comp_gro50$i.start),first)
+    qw50_mean=data.frame(chrom=q50_mean$chrom,start=q50_mean$i.start,expression=q50_mean$x,comp=w50$x)
+    qw50_sum=data.frame(chrom=q50_sum$chrom,start=q50_sum$i.start,expression=q50_sum$x,comp=w50$x)
+    
+    boxplot(log10(expression+1)~comp,data=qw50_mean)
+    qw50_mean$col=c("limegreen","lightskyblue2","maroon")[qw50_mean$comp]
+    qw50_sum$col=c("limegreen","lightskyblue2","maroon")[qw50_sum$comp]
+    my_comparisons <- list( c("AA", "AB"), c("AA", "BB"), c("AB", "BB"))
+    ggplot(qw50_mean, aes(x=comp, y=log10(expression+1),fill=col)) +  ylab("Expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+    
+    summary(lm(log10(expression+1)~comp,data=qw50_mean))
+            #     Call:
+            # lm(formula = log10(expression + 1) ~ comp, data = qw50_mean)
+            # 
+            # Residuals:
+            #     Min      1Q  Median      3Q     Max 
+            # -2.3390 -0.7109  0.1436  0.6869  1.9379 
+            # 
+            # Coefficients:
+            #             Estimate Std. Error t value Pr(>|t|)    
+            # (Intercept)  2.92093    0.01309 223.113  < 2e-16 ***
+            # compAB      -0.13910    0.01765  -7.881 3.53e-15 ***
+            # compBB      -0.18394    0.01944  -9.463  < 2e-16 ***
+            # ---
+            # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+            # 
+            # Residual standard error: 0.8121 on 11746 degrees of freedom
+            # Multiple R-squared:  0.008676,	Adjusted R-squared:  0.008507 
+            # F-statistic:  51.4 on 2 and 11746 DF,  p-value: < 2.2e-16
+    boxplot(log10(expression+1)~comp,data=qw50_sum)
+        ggplot(qw50_sum, aes(x=comp, y=log10(expression+1),fill=col)) +  ylab("Expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons)
+    plot(qw50_mean$expression~qw50_sum$expression,pch=19)
+    summary(lm(log10(expression+1)~comp,data=qw50_sum))
+            # Call:
+            # lm(formula = log10(expression + 1) ~ comp, data = qw50_sum)
+            # 
+            # Residuals:
+            #     Min      1Q  Median      3Q     Max 
+            # -2.4911 -0.7111  0.1455  0.6892  1.9407 
+            # 
+            # Coefficients:
+            #             Estimate Std. Error t value Pr(>|t|)    
+            # (Intercept)  3.52115    0.01314 267.871  < 2e-16 ***
+            # compAB      -0.13975    0.01772  -7.886  3.4e-15 ***
+            # compBB      -0.18494    0.01952  -9.475  < 2e-16 ***
+            # ---
+            # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+            # 
+            # Residual standard error: 0.8154 on 11746 degrees of freedom
+            # Multiple R-squared:  0.008694,	Adjusted R-squared:  0.008526 
+            # F-statistic: 51.51 on 2 and 11746 DF,  p-value: < 2.2e-16
+    
+
+    # gro_100
+    
+    q100_mean=aggregate(comp_gro100$expression,by=list(chrom=comp_gro100$chrom,i.start=comp_gro100$i.start),mean)
+    q100_sum=aggregate(comp_gro100$expression,by=list(chrom=comp_gro100$chrom,i.start=comp_gro100$i.start),sum)
+    w100=aggregate(comp_gro100$combined_comp,by=list(chrom=comp_gro100$chrom,i.start=comp_gro100$i.start),first)
+    qw100_mean=data.frame(chrom=q100_mean$chrom,start=q100_mean$i.start,expression=q100_mean$x,comp=w100$x)
+    qw100_sum=data.frame(chrom=q100_sum$chrom,start=q100_sum$i.start,expression=q100_sum$x,comp=w100$x)
+    
+    boxplot(log10(expression+1)~comp,data=qw100_mean)
+    summary(lm(log10(expression+1)~comp,data=qw100_mean))
+            #     Call:
+            # lm(formula = log10(expression + 1) ~ comp, data = qw100_mean)
+            # 
+            # Residuals:
+            #     Min      1Q  Median      3Q     Max 
+            # -2.4341 -0.7111  0.1449  0.6884  1.9397 
+            # 
+            # Coefficients:
+            #             Estimate Std. Error t value Pr(>|t|)    
+            # (Intercept)  3.22074    0.01313 245.353  < 2e-16 ***
+            # compAB      -0.13953    0.01770  -7.884 3.44e-15 ***
+            # compBB      -0.18460    0.01949  -9.471  < 2e-16 ***
+            # ---
+            # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+            # 
+            # Residual standard error: 0.8143 on 11746 degrees of freedom
+            # Multiple R-squared:  0.008688,	Adjusted R-squared:  0.008519 
+            # F-statistic: 51.47 on 2 and 11746 DF,  p-value: < 2.2e-16
+    boxplot(log10(expression+1)~comp,data=qw100_sum)
+    summary(lm(log10(expression+1)~comp,data=qw100_sum))
+            #     Call:
+            # lm(formula = log10(expression + 1) ~ comp, data = qw100_sum)
+            # 
+            # Residuals:
+            #     Min      1Q  Median      3Q     Max 
+            # -2.4911 -0.7112  0.1455  0.6892  1.9407 
+            # 
+            # Coefficients:
+            #             Estimate Std. Error t value Pr(>|t|)    
+            # (Intercept)  3.52115    0.01314 267.871  < 2e-16 ***
+            # compAB      -0.13975    0.01772  -7.886  3.4e-15 ***
+            # compBB      -0.18493    0.01952  -9.475  < 2e-16 ***
+            # ---
+            # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+            # 
+            # Residual standard error: 0.8154 on 11746 degrees of freedom
+            # Multiple R-squared:  0.008694,	Adjusted R-squared:  0.008525 
+            # F-statistic: 51.51 on 2 and 11746 DF,  p-value: < 2.2e-16
+    
+    
+    # gene_exp (protein coding only)
+    q=aggregate(comp_gene_exp_pt$TPM,by=list(chrom=comp_gene_exp_pt$chrom,i.start=comp_gene_exp_pt$i.start),mean)
+    w=aggregate(comp_gene_exp_pt$combined_comp,by=list(chrom=comp_gene_exp_pt$chrom,i.start=comp_gene_exp_pt$i.start),first)
+    qw=data.frame(chrom=q$chrom,start=q$i.start,TPM=q$x,comp=w$x)
+    qw$col=c("limegreen","lightskyblue2","maroon")[qw$comp]
+    my_comparisons <- list( c("AA", "AB"), c("AA", "BB"), c("AB", "BB"))
+    my_comparisons2 <- list( c("AA", "AB","BB"))
+    ggplot(qw, aes(x=comp, y=log10(TPM+1),fill=col)) +  ylab("Expression") + xlab("Compartment Level") + 
+geom_violin() + scale_fill_manual(values=c("lightskyblue2","limegreen","maroon")) + theme_classic() + theme(legend.position="none") + geom_boxplot(width=0.1) + stat_summary(fun.y=mean, geom="point", size=2, color="black") +
+stat_compare_means(comparisons = my_comparisons, method = "wilcox.test") # "kruskal.test", "t.test"
+    
+    kruskal.test(TPM ~ comp, data = qw)
+    pairwise.wilcox.test(log10(qw$TPM), qw$comp,p.adjust.method = "BH")
+    
+    summary(lm(log10(TPM+1)~comp,data=qw))
+                # Call:
+            # lm(formula = log10(TPM + 1) ~ comp, data = qw)
+            # 
+            # Residuals:
+            #      Min       1Q   Median       3Q      Max 
+            # -0.84151 -0.48975 -0.01034  0.38758  2.95324 
+            # 
+            # Coefficients:
+            #             Estimate Std. Error t value Pr(>|t|)    
+            # (Intercept)  0.84151    0.01057  79.591  < 2e-16 ***
+            # compAB      -0.04999    0.01445  -3.458 0.000546 ***
+            # compBB      -0.07529    0.01617  -4.657 3.25e-06 ***
+            # ---
+            # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+            # 
+            # Residual standard error: 0.5739 on 8536 degrees of freedom
+            # Multiple R-squared:  0.002763,	Adjusted R-squared:  0.00253 
+            # F-statistic: 11.83 on 2 and 8536 DF,  p-value: 7.425e-06
+
+# check expression level in the 3 groups with linear model
+    
+    summary(lm(log10(TPM+1)~comp,data=qw))
+
+    summary(lm(log10(TPM+1)~as.numeric(comp),data=qw))
+    
+```
+
+```{r scra from meeting with roland, include=FALSE, eval=FALSE}
+> mean(comp$Genome1_score1)
+[1] 0.00761427
+> mean(comp$Genome2_score1)
+[1] 0.05047799
+# shouldn't be PCR then, bc then mean would be 0?
+> par(mfrow=c(1,1),mar = c(4.1,4.1, 3.1, 0.1))
+> boxplot(comp_gene_exp$TPM~comp_gene_exp$combined_comp,outline=F) 
+> boxplot(log10(comp_gene_exp_pt$TPM+1)~comp_gene_exp_pt$combined_comp,outline=F)
+> 
+> boxplot(log10(comp_gene_exp_pt$TPM+1)~comp_gene_exp_pt$combined_comp,outline=T)
+> boxplot(log10(comp_gene_exp_pt$TPM+1)~comp_gene_exp_pt$combined_comp,outline=F)
+> summary(lm(I(log10(TPM+1))~I(as.numeric(combined_comp)),data=comp_gene_exp_pt))
+
+Call:
+lm(formula = I(log10(TPM + 1)) ~ I(as.numeric(combined_comp)), 
+    data = comp_gene_exp_pt)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.7292 -0.6338 -0.0789  0.4465  3.3395 
+
+Coefficients:
+                             Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   0.75286    0.01175  64.081  < 2e-16 ***
+I(as.numeric(combined_comp)) -0.02361    0.00570  -4.143 3.45e-05 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.642 on 21240 degrees of freedom
+Multiple R-squared:  0.0008073,	Adjusted R-squared:  0.0007603 
+F-statistic: 17.16 on 1 and 21240 DF,  p-value: 3.446e-05
+> summary(lm(I(log10(TPM+1))~combined_comp,data=comp_gene_exp_pt))
+
+Call:
+lm(formula = I(log10(TPM + 1)) ~ combined_comp, data = comp_gene_exp_pt)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.7315 -0.6346 -0.0795  0.4455  3.3435 
+
+Coefficients:
+                 Estimate Std. Error t value Pr(>|t|)    
+(Intercept)      0.731478   0.007476  97.847  < 2e-16 ***
+combined_compAB -0.029759   0.010247  -2.904  0.00369 ** 
+combined_compBB -0.046457   0.011451  -4.057 4.98e-05 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.642 on 21239 degrees of freedom
+Multiple R-squared:  0.0008318,	Adjusted R-squared:  0.0007377 
+F-statistic: 8.841 on 2 and 21239 DF,  p-value: 0.0001452
+
+> hist(log10(comp_gene_exp_pt$TPM+1),breaks=100)
+> hist(log10(comp_gene_exp_pt$TPM+1),breaks=200)
+> hist(log10(comp_gene_exp_pt$TPM+1[which(log10(comp_gene_exp_pt$TPM+1)>0.25]),breaks=200)
+Error: unexpected ']' in "hist(log10(comp_gene_exp_pt$TPM+1[which(log10(comp_gene_exp_pt$TPM+1)>0.25]"
+> hist(log10(comp_gene_exp_pt$TPM+1[which(log10(comp_gene_exp_pt$TPM+1)>0.25)]),breaks=200)
+Warning message:
+In comp_gene_exp_pt$TPM + 1[which(log10(comp_gene_exp_pt$TPM + 1) >  :
+  longer object length is not a multiple of shorter object length
+> hist(log10(comp_gene_exp_pt$TPM+1)[which(log10(comp_gene_exp_pt$TPM+1)>0.25)],breaks=200)
+> a=log10(comp_gene_exp_pt$TPM+1)>0.25
+> boxplot(log10(TPM+1)~combined_comp,data=comp_gene_exp_pt,outline=F)
+> boxplot(log10(TPM+1)~combined_comp,data=comp_gene_exp_pt[a,],outline=F)
+> boxplot(log10(TPM+1)~combined_comp,data=comp_gene_exp_pt[a,],outline=F,notch=1)
+> summary(lm(I(log10(TPM+1))~I(as.numeric(combined_comp)),data=comp_gene_exp_pt[a,]))
+
+Call:
+lm(formula = I(log10(TPM + 1)) ~ I(as.numeric(combined_comp)), 
+    data = comp_gene_exp_pt[a, ])
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.81943 -0.40600 -0.06021  0.30629  2.99368 
+
+Coefficients:
+                              Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   1.088197   0.011924  91.262   <2e-16 ***
+I(as.numeric(combined_comp)) -0.018349   0.005813  -3.157   0.0016 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.5302 on 13908 degrees of freedom
+Multiple R-squared:  0.0007159,	Adjusted R-squared:  0.000644 
+F-statistic: 9.964 on 1 and 13908 DF,  p-value: 0.0016
+
+
+q=aggregate(comp_gene_exp_pt$TPM,by=list(chrom=comp_gene_exp_pt$chrom,i.start=comp_gene_exp_pt$i.start),mean)
+w=aggregate(comp_gene_exp_pt$combined_comp,by=list(chrom=comp_gene_exp_pt$chrom,i.start=comp_gene_exp_pt$i.start),first)
+
+> head(w)
+  chrom i.start  x
+1 chr11       1 AB
+2 chr16       1 AA
+3 chr18       1 AB
+4  chr2       1 BB
+5 chr20       1 AA
+6  chr3       1 AB
+> dim(w)
+[1] 8539    3
+> head(q)
+  chrom i.start     x
+1 chr11       1  3.67
+2 chr16       1 14.87
+3 chr18       1 22.22
+4  chr2       1  4.83
+5 chr20       1  0.00
+6  chr3       1  0.45
+> qw=data.frame(chrom=q$chrom,start=q$i.start,TPM=q$x,comp=w$x)
+> head(qw)
+  chrom start   TPM comp
+1 chr11     1  3.67   AB
+2 chr16     1 14.87   AA
+3 chr18     1 22.22   AB
+4  chr2     1  4.83   BB
+5 chr20     1  0.00   AA
+6  chr3     1  0.45   AB
+> boxplot(log10(TPM+1)~comp,data=qw)
+> summary(lm((log10(TPM+1)~comp,data=qw))
+Error: unexpected ',' in "summary(lm((log10(TPM+1)~comp,"
+> summary(lm(log10(TPM+1)~comp,data=qw))
+
+Call:
+lm(formula = log10(TPM + 1) ~ comp, data = qw)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.84151 -0.48975 -0.01034  0.38758  2.95324 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  0.84151    0.01057  79.591  < 2e-16 ***
+compAB      -0.04999    0.01445  -3.458 0.000546 ***
+compBB      -0.07529    0.01617  -4.657 3.25e-06 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.5739 on 8536 degrees of freedom
+Multiple R-squared:  0.002763,	Adjusted R-squared:  0.00253 
+F-statistic: 11.83 on 2 and 8536 DF,  p-value: 7.425e-06
+
+> summary(lm(log10(TPM+1)~as.numeric(comp),data=qw))
+
+Call:
+lm(formula = log10(TPM + 1) ~ as.numeric(comp), data = qw)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.83726 -0.49194 -0.01101  0.38736  2.94586 
+
+Coefficients:
+                  Estimate Std. Error t value Pr(>|t|)    
+(Intercept)       0.875625   0.016602  52.743  < 2e-16 ***
+as.numeric(comp) -0.038363   0.008049  -4.766 1.91e-06 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.5739 on 8537 degrees of freedom
+Multiple R-squared:  0.002654,	Adjusted R-squared:  0.002537 
+F-statistic: 22.72 on 1 and 8537 DF,  p-value: 1.908e-06
+```
+
+```{r scrap, include=FALSE, eval=FALSE}
+
+# boxplot all expression values within vs mean value within compartment windowsize
+# check if all genes are protein coding or not, differentiate here
+
+# intersect gro seq with compartments
+
+
+
+require(data.table)
+x = data.table(chr=c("Chr1", "Chr1", "Chr2", "Chr2", "Chr2"),
+               start=c(5,10, 1, 25, 50), end=c(11,20,4,52,60))
+y = data.table(chr=c("Chr1", "Chr1", "Chr2"), start=c(1, 15,1),
+               end=c(4, 18, 55), geneid=letters[1:3])
+setkey(y, chr, start, end)
+foverlaps(x, y, type="any", which=TRUE)
+foverlaps(x, y, type="any", which=TRUE, mult="all")
+foverlaps(x, y, type="any")
+foverlaps(x, y, type="any", nomatch=NULL)
+foverlaps(x, y, type="within", which=TRUE)
+foverlaps(x, y, type="within")
+foverlaps(x, y, type="start")
+
+
+comp_dt=as.data.table(comp)
+# just so that intervals like 15-16 and 16-18 do not overlap
+comp_dt$start = comp_dt$start + 1 
+#gene_exp_dt=as.data.table(gene_exp)
+gro_50_dt=as.data.table(gro_50)
+gro_50_dt$start = gro_50_dt$start + 1 
+setkey(gro_50_dt, chrom, start, end)
+comp_gro50=foverlaps(comp_dt, gro_50_dt, type="any", mult="all") # , minoverlap=2 not yet implemented
+
+gro_100_dt=as.data.table(gro_100)
+gro_100_dt$start = gro_100_dt$start + 1 
+setkey(gro_100_dt, chrom, start, end)
+comp_gro100=foverlaps(comp_dt, gro_100_dt, type="any", mult="all") 
+
+saveRDS(comp_gro50,"/fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/results/comp_gro50.rds")
+saveRDS(comp_gro100,"/fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/results/comp_gro100.rds")
+
+# scp bih:/fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/results/comp_gro50.rds /Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro50.rds
+# scp bih:/fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/results/comp_gro100.rds /Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro100.rds
+
+comp_gro50 = readRDS("/Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro50.rds")
+comp_gro100 = readRDS("/Users/jmarkow/Desktop/GAM/Co-Phasing/results/comp_gro100.rds")
+# class(comp_gro50$combined_comp) # "character"
+comp_gro50$combined_comp=factor(comp_gro50$combined_comp, levels = c("AA","AB","BA","BB"))
+# class(comp_gro50$combined_comp) # "factor"
+class(comp_gro50$expression) # "integer"
+#boxplot(comp_gro50,formula=expression~combined_comp, data=comp_gro50)
+#Error in x[floor(d)] + x[ceiling(d)] : non-numeric argument to binary operator
+comp_gro50_red=comp_gro50[,c("expression","combined_comp")]
+boxplot(comp_gro50_red$expression~comp_gro50_red$combined_comp)
+# looks promising
+# without outliers
+boxplot(comp_gro50_red$expression~comp_gro50_red$combined_comp, outline=F) 
+# boojachacka
+
+# significance!
+# log?
+boxplot(log(comp_gro50_red$expression)~comp_gro50_red$combined_comp)
+# also ok I guess
+
+comp_gro50_red_AB=comp_gro50_red
+comp_gro50_red_AB$combined_comp[which(comp_gro50_red_AB$combined_comp=="BA")]="AB"
+comp_gro50_red_AB$combined_comp=factor(comp_gro50_red_AB$combined_comp, levels = c("AA","AB","BB"))
+boxplot(comp_gro50_red_AB$expression~comp_gro50_red_AB$combined_comp, outline=F,notch=T) 
+
+### tukey test
+# library
+install.packages("multcompView")
+library(multcompView)
+# What is the effect of the treatment on the value ?
+model=lm( comp_gro50_red_AB$expression~comp_gro50_red_AB$combined_comp )
+ANOVA=aov(model)
+
+# Tukey test to study each pair of treatment :
+TUKEY <- TukeyHSD(x=ANOVA, 'comp_gro50_red_AB$combined_comp', conf.level=0.95)
+TUKEY
+    # Tukey multiple comparisons of means
+    # 95% family-wise confidence level
+    # 
+    # Fit: aov(formula = model)
+    # 
+    # $`comp_gro50_red_AB$combined_comp`
+    # diff       lwr        upr     p adj
+    # AB-AA -374.70226 -490.3785 -259.02599 0.0000000
+    # BB-AA -456.06430 -583.4694 -328.65916 0.0000000
+    # BB-AB  -81.36204 -203.3805   40.65638 0.2619061
+
+# Tuckey test representation :
+plot(TUKEY , las=1 , col="brown")
+
+# include n, number of entries
+
+
+### redo barplot
+# basic - these numbers are tweakd a bit, this is not correct, I should have just taken the sum!
+genom=c(rep(1,times=4961),rep(2,times=4847),rep(3,times=189),
+      rep(1,times=4897),rep(2,times=4801),rep(3,times=296),
+      rep(1,times=4802),rep(2,times=4714),rep(3,times=473))
+reso=c(rep("50 kb",times=sum(4961,4847,189)),
+       rep("100 kb",times=sum(4897,4801,296)),
+       rep("200 kb",times=sum(4802,4714,473)))
+counts <- table(genom, reso)
+counts=counts[c(3,2,1),c(3,1,2)]
+# 4962+4849+189
+# 4898+4803+299
+# 4812+4716+473
+pdf("/Users/jmarkow/Desktop/GAM/Co-Phasing/WPE_basic.pdf",width=6,height=6)
+barplot(counts, main="Window Phasing Efficiency", 
+        ylab="Percent of positive windows",ylim=c(0,10000),yaxt="none",
+  xlab="Resolution", col=c("grey",rgb(79,173,234,maxColorValue = 255),rgb(237,125,49,maxColorValue = 255)),
+  legend = c("Both","Genome 2", "Genome 1"))
+axis(2,at=c(seq(0,10000,2000)),labels = seq(0,100,20))
+text(bp,counts[1,]/2,labels=counts[1,]/100,cex=0.8)
+text(bp,(counts[1,]+(counts[2,]/2)),labels=counts[2,]/100,cex=0.8)
+text(bp,(counts[1,]+counts[2,]+(counts[3,]/2)),labels=counts[3,]/100,cex=0.8)
+dev.off()
+
+# approach 2 50kb resolution
+genom=c(rep(1,times=1192),rep(2,times=1153),rep(3,times=105),
+      rep(1,times=1822),rep(2,times=1764),rep(3,times=158),
+      rep(1,times=2369),rep(2,times=2297),rep(3,times=171),
+      rep(1,times=3011),rep(2,times=2922),rep(3,times=180))
+reso=c(rep("1 kb",times=sum(1192,1153,105)),
+       rep("50 kb",times=sum(1822,1764,158)),
+       rep("100 kb",times=sum(2369,2297,171)),
+       rep("200 kb",times=sum(3011,2922,180)))
+counts <- table(genom, reso)
+counts=counts[c(3,2,1),c(1,4,2,3)]
+pdf("/Users/jmarkow/Desktop/GAM/Co-Phasing/WPE_cutoff_50.pdf",width=6,height=6)
+barplot(counts, main="Window Phasing Efficiency \n 50kb resolution", 
+        ylab="Percent of positive windows",ylim=c(0,10000),yaxt="none",
+  xlab="Resolution", col=c("grey",rgb(79,173,234,maxColorValue = 255),rgb(237,125,49,maxColorValue = 255)),
+  legend = c("Both","Genome 2", "Genome 1"))
+axis(2,at=c(seq(0,10000,2000)),labels = seq(0,100,20))
+text(bp,counts[1,]/2,labels=counts[1,]/100,cex=0.8)
+text(bp,(counts[1,]+(counts[2,]/2)),labels=counts[2,]/100,cex=0.8)
+text(bp,(counts[1,]+counts[2,]+(counts[3,]/2)),labels=counts[3,]/100,cex=0.8)
+dev.off()
+
+# approach 2 100kb resolution
+genom=c(rep(1,times=1303),rep(2,times=1261),rep(3,times=145),
+      rep(1,times=1749),rep(2,times=1696),rep(3,times=231),
+      rep(1,times=2157),rep(2,times=2096),rep(3,times=256),
+      rep(1,times=2764),rep(2,times=2688),rep(3,times=275))
+reso=c(rep("1 kb",times=sum(1303,1261,145)),
+       rep("50 kb",times=sum(1749,1696,231)),
+       rep("100 kb",times=sum(2157,2096,256)),
+       rep("200 kb",times=sum(2764,2688,275)))
+counts <- table(genom, reso)
+counts=counts[c(3,2,1),c(1,4,2,3)]
+pdf("/Users/jmarkow/Desktop/GAM/Co-Phasing/WPE_cutoff_100.pdf",width=6,height=6)
+bp=barplot(counts, main="Window Phasing Efficiency \n 100kb resolution", 
+        ylab="Percent of positive windows",ylim=c(0,10000),yaxt="none",
+  xlab="Resolution", col=c("grey",rgb(79,173,234,maxColorValue = 255),rgb(237,125,49,maxColorValue = 255)),
+  legend = c("Both","Genome 2", "Genome 1"))
+axis(2,at=c(seq(0,10000,2000)),labels = seq(0,100,20))
+text(bp,counts[1,]/2,labels=counts[1,]/100,cex=0.8)
+text(bp,(counts[1,]+(counts[2,]/2)),labels=counts[2,]/100,cex=0.8)
+text(bp,(counts[1,]+counts[2,]+(counts[3,]/2)),labels=counts[3,]/100,cex=0.8)
+dev.off()
+
+# approach 2 200kb resolution
+genom=c(rep(1,times=1448),rep(2,times=1407),rep(3,times=203),
+      rep(1,times=1853),rep(2,times=1799),rep(3,times=347),
+      rep(1,times=2096),rep(2,times=2037),rep(3,times=385),
+      rep(1,times=2560),rep(2,times=2488),rep(3,times=422))
+reso=c(rep("1 kb",times=sum(1448,1407,203)),
+       rep("50 kb",times=sum(1853,1799,347)),
+       rep("100 kb",times=sum(2096,2037,385)),
+       rep("200 kb",times=sum(2560,2488,422)))
+counts <- table(genom, reso)
+counts=counts[c(3,2,1),c(1,4,2,3)]
+pdf("/Users/jmarkow/Desktop/GAM/Co-Phasing/WPE_cutoff_200.pdf",width=6,height=6)
+bp=barplot(counts, main="Window Phasing Efficiency \n 200kb resolution", 
+        ylab="Percent of positive windows",ylim=c(0,10000),yaxt="none",
+  xlab="Resolution", col=c("grey",rgb(79,173,234,maxColorValue = 255),rgb(237,125,49,maxColorValue = 255)),
+  legend = c("Both","Genome 2", "Genome 1"))
+axis(2,at=c(seq(0,10000,2000)),labels = seq(0,100,20))
+text(bp,counts[1,]/2,labels=counts[1,]/100,cex=0.8)
+text(bp,(counts[1,]+(counts[2,]/2)),labels=counts[2,]/100,cex=0.8)
+text(bp,(counts[1,]+counts[2,]+(counts[3,]/2)),labels=counts[3,]/100,cex=0.8)
+dev.off()
+
+```
+
+
