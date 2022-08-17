@@ -114,15 +114,14 @@ process createCoverageTables
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
     
     input:
-    tuple val(name), path(bed)
-    tuple path(coverage_50000), path(coverage_100000), path(coverage_200000)
+    path(covs)
     
     output:
-    path("${name}.table")
+    path("out.table")
     
     script:
     """
-    echo "$coverage_50000 $coverage_100000 $coverage_200000" > ${name}.table
+    echo "$covs" > out.table
     """
     // """
     // # find all coverage files and paste them by column with the resolution genomic bins
@@ -169,8 +168,10 @@ workflow
     bed = convertBamToBed(bam)
     genome_size = getGenomeSizes(ref_fa)
     genome_bins = binGenome(genome_size)
-    coverage = calcCoverage(bed, genome_bins).view()
-    cov_table = createCoverageTables(bed, coverage)
+    coverage = calcCoverage(bed, genome_bins).toList()
+    cov_table = createCoverageTables(coverage.transpose())
+    coverage.view()
+    coverage.transpose().view()
 
     // pileup = bcftoolsPileup(ref_fa, bam.join(vcf))
     // seeds = seedsPerSample(vcf.join(pileup))
