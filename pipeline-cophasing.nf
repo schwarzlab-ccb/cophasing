@@ -4,12 +4,29 @@ params.out_dir = "out"
 params.debug_out = "out"
 scripts_folder = "${projectDir}/scripts"
 
+
+process filterUnphased 
+{
+    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+
+    input:
+    tuple val(name), path(vcf) 
+
+    output:
+    tuple val(name), path("${name}.recode.vcf") 
+
+    script:
+    """
+    vcftools --vcf $vcf --out $name --phased --recode
+    """
+}
+
 process convertBamToBed 
 {
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
 
     input:
-    tuple val(name), path(bam)
+    tuple val(name), path(bam) 
     
     output:
     tuple val(name), path("${name}.bed")
@@ -124,15 +141,32 @@ process createCoverageTables
     """
 }
 
-
+def getVcfFiles(bam_names) 
+{
+    if (params.vcf) 
+    {
+        vcf_files = Channel.fromPath(params.vcf)
+        vcf_files.ifEmpty{error "No VCF files found matching the naming of the bam files."}
+        vcf = bam_names.combine(vcf_files)
+        vcf.ifEmpty{error "Failed to match VCF files onto BAM files."}
+    }
+    else 
+    {
+        vcf_filename = params.bam - ".bam" + ".vcf"
+        vcf = Channel.fromFilePairs(vcf_filename, size: 1)
+    }
+    return vcf
+}
 
 workflow 
 {
     bam = Channel.fromFilePairs(params.bam, size: 1)
-    vcf = Channel.fromFilePairs(params.vcf, size: 1)   
+    bam_names = bam.map{name, file -> name}
+    vcf = getVcfFiles(bam_names)
     ref_fa = file(params.fa)
     bin_sizes = Channel.from(50000, 100000, 200000)
     
+    filtered_vcf = filterUnphased(vcf)
     sample_beds = convertBamToBed(bam)
     genome_size = getGenomeSizes(ref_fa)
     genome_bins = binGenome(genome_size, bin_sizes)
@@ -141,6 +175,6 @@ workflow
     covs_by_bin = genome_bins.join(coverages.groupTuple())
     cov_tables = createCoverageTables(covs_by_bin)
 
-    // pileup = bcftoolsPileup(ref_fa, bam.join(vcf))
+    pileup = bcftoolsPileup(ref_fa, bam.join(filtered_vcf))
     // seeds = seedsPerSample(vcf.join(pileup))
 }
