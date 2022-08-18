@@ -77,15 +77,14 @@ process binGenome
 
     input:
     path(genome_sizes)
+    val(bin)
     
     output:
-    tuple path("*.50000.bed"), path("*.100000.bed"), path("*.200000.bed")
+    tuple val(bin), path("${genome_sizes.baseName}.${bin}.bed")
 
     script:
     """
-    bedtools makewindows -g $genome_sizes -w 50000 > ${genome_sizes.baseName}.50000.bed
-    bedtools makewindows -g $genome_sizes -w 100000 > ${genome_sizes.baseName}.100000.bed
-    bedtools makewindows -g $genome_sizes -w 200000 > ${genome_sizes.baseName}.200000.bed
+    bedtools makewindows -g $genome_sizes -w ${bin} > ${genome_sizes.baseName}.${bin}.bed
     """
 }
 
@@ -94,17 +93,14 @@ process calcCoverage
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
     
     input:
-    tuple val(name), path(bed)
-    tuple path(binned_genome_50000), path(binned_genome_100000), path(binned_genome_200000)
+    tuple val(bin), path(bin_bed), val(name), path(read_bed)
     
     output:
-    tuple path("*.50000.cov"), path("*.100000.cov"), path("*.200000.cov")
+    tuple val(bin), val(name), path("${name}.${bin}.cov")
     
     script:
     """
-    bedtools coverage -a ${binned_genome_50000} -b $bed | awk \"{print \\\$5}\" > ${name}.50000.cov
-    bedtools coverage -a ${binned_genome_100000} -b $bed | awk \"{print \\\$5}\" > ${name}.100000.cov
-    bedtools coverage -a ${binned_genome_200000} -b $bed | awk \"{print \\\$5}\" > ${name}.200000.cov
+    bedtools coverage -a $bin_bed -b $read_bed | awk \"{print \\\$5}\" > ${name}.${bin}.cov
     """
 }
 
@@ -114,64 +110,36 @@ process createCoverageTables
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
     
     input:
-    path(covs)
+    tuple val(bin), path(genome_bin), val(names), path(covs)
     
     output:
-    path("out.table")
+    path("${bin}.table")
     
     script:
+    header = "chrom\tstart\tstop\t" + names.join("\t")
     """
-    echo "$covs" > out.table
-    """
-    // """
-    // # find all coverage files and paste them by column with the resolution genomic bins
-    // covlist=\`find -type f -name '*.cov'\`
-    // paste /fast/groups/ag_schwarz/Projects/project-gam/Co-Phasing/prelim/F123_binned_genomes/F123_sorted_autosomes.window_size.$res.bed \$covlist > coverage_table_cophased_subsampled_F123_dist_cutoff_$dist.res_$res.$parent.iteration_1.210521.table
-
-    // # then make and add a header including the sample names 
-    // echo -e \"chrom\\tstart\\tstop\" \$covlist > header.txt
-    // tr ' ' \\\t < header.txt | sponge header.txt
-    // cat header.txt coverage_table_cophased_subsampled_F123_dist_cutoff_$dist.res_$res.$parent.iteration_1.210521.table | sponge coverage_table_cophased_subsampled_F123_dist_cutoff_$dist.res_$res.$parent.iteration_1.210521.table
-    // cp coverage_table_cophased_subsampled_F123_dist_cutoff_$dist.res_$res.$parent.iteration_1.210521.table $output_dir
-    // """
-}
-
-process pythonTest
-{
-    output:
-    stdout
-
-    script:
-    """
-    $scripts_folder/test.py
+    # find all coverage files and paste them by column with the resolution genomic bins
+    echo -e \"$header\" > ${bin}.table
+    paste $genome_bin $covs >> ${bin}.table
     """
 }
 
-process RTest
-{
-    output:
-    stdout
 
-    script:
-    """
-    $scripts_folder/test.py
-    """
-}
 
 workflow 
 {
     bam = Channel.fromFilePairs(params.bam, size: 1)
     vcf = Channel.fromFilePairs(params.vcf, size: 1)   
     ref_fa = file(params.fa)
+    bin_sizes = Channel.from(50000, 100000, 200000)
     
-    pythonTest().view()
-    bed = convertBamToBed(bam)
+    sample_beds = convertBamToBed(bam)
     genome_size = getGenomeSizes(ref_fa)
-    genome_bins = binGenome(genome_size)
-    coverage = calcCoverage(bed, genome_bins).toList()
-    cov_table = createCoverageTables(coverage.transpose())
-    coverage.view()
-    coverage.transpose().view()
+    genome_bins = binGenome(genome_size, bin_sizes)
+    samples_with_bins = genome_bins.combine(sample_beds)
+    coverages = calcCoverage(samples_with_bins)
+    covs_by_bin = genome_bins.join(coverages.groupTuple())
+    cov_tables = createCoverageTables(covs_by_bin)
 
     // pileup = bcftoolsPileup(ref_fa, bam.join(vcf))
     // seeds = seedsPerSample(vcf.join(pileup))
