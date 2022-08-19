@@ -1,8 +1,7 @@
 nextflow.enable.dsl=2
 
 params.out_dir = "out"
-params.debug_out = "out"
-scripts_folder = "${projectDir}/scripts"
+params.debug_out = ""
 
 process filterUnphased 
 {
@@ -21,6 +20,22 @@ process filterUnphased
 }
 
 process convertBamToBed 
+{
+    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+
+    input:
+    tuple val(name), path(bam) 
+    
+    output:
+    tuple val(name), path("${name}.bam.bed")
+
+    script:
+    """
+    bedtools bamtobed -i $bam > ${name}.bam.bed
+    """
+}
+
+process convertBamToBed2 
 {
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
 
@@ -93,31 +108,15 @@ process splitBamFilesToHaps
     tuple val(name), path(bam), path(closest_bed), val(hap)
     
     output:
-    tuple val("${name}_${hap}"), path("${name}_${hap}.bam")
+    tuple val("${name}_${hap}"), path("${name}_${hap}.bam.bed")
     
     script:
     // TODO: Check if this is correct splitting!   
     filter = ("${hap}" == "hap1") ?  "1|0" : "0|1"
     """
     grep -F '$filter' $closest_bed | cut -f4 > ${name}.${hap}.bed.list
-    gatk FilterSamReads -I $bam -O ${name}_${hap}.bam -READ_LIST_FILE ${name}.${hap}.bed.list -FILTER includeReadList
-    """
-}
-
-process SNPsPerSample 
-{
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
-
-    input:
-    path(ref_genome)
-    tuple val(name), path(bam), path(vcf)
-    
-    output:
-    tuple val(name), path("${name}.pileup")
-
-    script:
-    """
-    $scripts_folder/co-phasing/create_sample_spec_SNP_seeds_to_find_closest_obs_SNP.R 
+    gatk FilterSamReads -I $bam -O ${name}_${hap}.bam -READ_LIST_FILE ${name}.${hap}.bed.list -FILTER includeReadList    
+    bedtools bamtobed -i ${name}_${hap}.bam > "${name}_${hap}.bam.bed"
     """
 }
 
@@ -174,7 +173,7 @@ process calcCoverage
 
 process createCoverageTables
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir params.out_dir, mode: "copy"
     
     input:
     tuple val(bin), path(genome_bin), val(names), path(covs)
@@ -183,11 +182,15 @@ process createCoverageTables
     path("${bin}.table")
     
     script:
+    // Names of samples and files are lexicographically sorted first
+    names.sort()
+    cov_files = "$covs".split(" ");
+    cov_files.sort()
     header = "chrom\tstart\tstop\t" + names.join("\t")
     """
     # find all coverage files and paste them by column with the resolution genomic bins
     echo -e \"$header\" > ${bin}.table
-    paste $genome_bin $covs >> ${bin}.table
+    paste $genome_bin ${cov_files.join(" ")} >> ${bin}.table
     """
 }
 
@@ -221,14 +224,15 @@ workflow
     genome_bins = binGenome(genome_size, bin_sizes)
     
     filtered_vcf = filterUnphased(vcf)
-
+    
     sample_beds = convertBamToBed(bam)
-    coverages = calcCoverage(genome_bins.combine(sample_beds))
-    covs_by_bin = genome_bins.join(coverages.groupTuple())
-    cov_tables = createCoverageTables(covs_by_bin)
 
     pileup = bcftoolsPileup(ref_fa, bam.join(filtered_vcf))
     vcf_beds = convertVcfToBed(filtered_vcf)
     closest_beds = findClosesBed(sample_beds.join(vcf_beds))
-    hap_bam = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
+    hap_beds = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
+
+    coverages = calcCoverage(genome_bins.combine(sample_beds.mix(hap_beds)))
+    covs_by_bin = genome_bins.join(coverages.groupTuple())
+    cov_tables = createCoverageTables(covs_by_bin)
 }
