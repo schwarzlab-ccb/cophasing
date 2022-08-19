@@ -86,6 +86,26 @@ process findClosesBed
     """
 }
 
+process splitBamFilesToHaps 
+{
+    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+
+    input:
+    tuple val(name), path(bam), path(closest_bed) 
+    
+    output:
+    tuple val(name), path("${name}.hap1.bam"), path("${name}.hap2.bam")
+    
+    script:
+    // TODO: Check if this is correct splitting!    
+    """
+    grep -F '1|0' $closest_bed | cut -f4 > ${name}.hap1.bed.list
+    grep -F '0|1' $closest_bed | cut -f4 > ${name}.hap2.bed.list
+    gatk FilterSamReads -I $bam -O ${name}.hap1.bam -READ_LIST_FILE ${name}.hap1.bed.list -FILTER includeReadList
+    gatk FilterSamReads -I $bam -O ${name}.hap2.bam -READ_LIST_FILE ${name}.hap2.bed.list -FILTER includeReadList
+    """
+}
+
 process SNPsPerSample 
 {
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
@@ -210,5 +230,5 @@ workflow
     pileup = bcftoolsPileup(ref_fa, bam.join(filtered_vcf))
     vcf_beds = convertVcfToBed(filtered_vcf)
     closest_beds = findClosesBed(sample_beds.join(vcf_beds))
-    // seeds = seedsPerSample(vcf.join(pileup))
+    haps = splitBamFilesToHaps(bam.join(closest_beds))
 }
