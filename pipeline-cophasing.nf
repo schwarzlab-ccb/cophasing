@@ -4,7 +4,6 @@ params.out_dir = "out"
 params.debug_out = "out"
 scripts_folder = "${projectDir}/scripts"
 
-
 process filterUnphased 
 {
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
@@ -91,18 +90,17 @@ process splitBamFilesToHaps
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
 
     input:
-    tuple val(name), path(bam), path(closest_bed) 
+    tuple val(name), path(bam), path(closest_bed), val(hap)
     
     output:
-    tuple val(name), path("${name}.hap1.bam"), path("${name}.hap2.bam")
+    tuple val("${name}_${hap}"), path("${name}_${hap}.bam")
     
     script:
-    // TODO: Check if this is correct splitting!    
+    // TODO: Check if this is correct splitting!   
+    filter = ("${hap}" == "hap1") ?  "1|0" : "0|1"
     """
-    grep -F '1|0' $closest_bed | cut -f4 > ${name}.hap1.bed.list
-    grep -F '0|1' $closest_bed | cut -f4 > ${name}.hap2.bed.list
-    gatk FilterSamReads -I $bam -O ${name}.hap1.bam -READ_LIST_FILE ${name}.hap1.bed.list -FILTER includeReadList
-    gatk FilterSamReads -I $bam -O ${name}.hap2.bam -READ_LIST_FILE ${name}.hap2.bed.list -FILTER includeReadList
+    grep -F '$filter' $closest_bed | cut -f4 > ${name}.${hap}.bed.list
+    gatk FilterSamReads -I $bam -O ${name}_${hap}.bam -READ_LIST_FILE ${name}.${hap}.bed.list -FILTER includeReadList
     """
 }
 
@@ -195,7 +193,7 @@ process createCoverageTables
 
 def getVcfFiles(bam_names) 
 {
-    if (params.vcf) 
+    if (params.containsKey("vcf")) 
     {
         vcf_files = Channel.fromPath(params.vcf)
         vcf_files.ifEmpty{error "No VCF files found matching the naming of the bam files."}
@@ -217,18 +215,20 @@ workflow
     vcf = getVcfFiles(bam_names)
     ref_fa = file(params.fa)
     bin_sizes = Channel.from(50000, 100000, 200000)
+
     
-    filtered_vcf = filterUnphased(vcf)
-    sample_beds = convertBamToBed(bam)
     genome_size = getGenomeSizes(ref_fa)
     genome_bins = binGenome(genome_size, bin_sizes)
-    samples_with_bins = genome_bins.combine(sample_beds)
-    coverages = calcCoverage(samples_with_bins)
+    
+    filtered_vcf = filterUnphased(vcf)
+
+    sample_beds = convertBamToBed(bam)
+    coverages = calcCoverage(genome_bins.combine(sample_beds))
     covs_by_bin = genome_bins.join(coverages.groupTuple())
     cov_tables = createCoverageTables(covs_by_bin)
 
     pileup = bcftoolsPileup(ref_fa, bam.join(filtered_vcf))
     vcf_beds = convertVcfToBed(filtered_vcf)
     closest_beds = findClosesBed(sample_beds.join(vcf_beds))
-    haps = splitBamFilesToHaps(bam.join(closest_beds))
+    hap_bam = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
 }
