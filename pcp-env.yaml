@@ -16,6 +16,7 @@ dependencies:
   - nextflow
   - samtools
   - vcftools
+  - bedops
   - pip:
     - biopython
     - numpy

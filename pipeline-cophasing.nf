@@ -29,11 +29,27 @@ process convertBamToBed
     tuple val(name), path(bam) 
     
     output:
-    tuple val(name), path("${name}.bed")
+    tuple val(name), path("${name}.bam.bed")
 
     script:
     """
-    bedtools bamtobed -i $bam > ${name}.bed
+    bedtools bamtobed -i $bam > ${name}.bam.bed
+    """
+}
+
+process convertVcfToBed 
+{
+    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+
+    input:
+    tuple val(name), path(vcf) 
+    
+    output:
+    tuple val(name), path("${name}.vcf.bed")
+
+    script:
+    """
+    cat $vcf | vcf2bed |  sort -k1,1V -k2,2n -k3,3n > ${name}.vcf.bed
     """
 }
 
@@ -51,6 +67,22 @@ process bcftoolsPileup
     script:
     """
     bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam > ${name}.pileup 
+    """
+}
+
+process findClosesBed 
+{
+    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+
+    input:
+    tuple val(name), path(bam_bed), path(vcf_bed) 
+    
+    output:
+    tuple val(name), path("${name}.closest.bed")
+    
+    script:
+    """
+    bedtools closest -d -t all -k 2 -a $bam_bed -b $vcf_bed > ${name}.closest.bed
     """
 }
 
@@ -176,5 +208,7 @@ workflow
     cov_tables = createCoverageTables(covs_by_bin)
 
     pileup = bcftoolsPileup(ref_fa, bam.join(filtered_vcf))
+    vcf_beds = convertVcfToBed(filtered_vcf)
+    closest_beds = findClosesBed(sample_beds.join(vcf_beds))
     // seeds = seedsPerSample(vcf.join(pileup))
 }
