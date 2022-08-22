@@ -1,5 +1,7 @@
 nextflow.enable.dsl=2
 
+// Default parameter values
+params.bins = [50000, 100000, 200000]
 params.out_dir = "out"
 params.debug_out = ""
 
@@ -20,22 +22,6 @@ process filterUnphased
 }
 
 process convertBamToBed 
-{
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
-
-    input:
-    tuple val(name), path(bam) 
-    
-    output:
-    tuple val(name), path("${name}.bam.bed")
-
-    script:
-    """
-    bedtools bamtobed -i $bam > ${name}.bam.bed
-    """
-}
-
-process convertBamToBed2 
 {
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
 
@@ -170,16 +156,17 @@ process calcCoverage
     """
 }
 
-
+// find all coverage files and paste them by column with the resolution genomic bins
 process createCoverageTables
 {
     publishDir params.out_dir, mode: "copy"
     
     input:
+    val(genome_name)
     tuple val(bin), path(genome_bin), val(names), path(covs)
     
     output:
-    path("${bin}.table")
+    path("${genome_name}.${bin}.table")
     
     script:
     // Names of samples and files are lexicographically sorted first
@@ -188,9 +175,8 @@ process createCoverageTables
     cov_files.sort()
     header = "chrom\tstart\tstop\t" + names.join("\t")
     """
-    # find all coverage files and paste them by column with the resolution genomic bins
-    echo -e \"$header\" > ${bin}.table
-    paste $genome_bin ${cov_files.join(" ")} >> ${bin}.table
+    echo -e \"$header\" > ${genome_name}.${bin}.table
+    paste $genome_bin ${cov_files.join(" ")} >> ${genome_name}.${bin}.table
     """
 }
 
@@ -217,7 +203,7 @@ workflow
     bam_names = bam.map{name, file -> name}
     vcf = getVcfFiles(bam_names)
     ref_fa = file(params.fa)
-    bin_sizes = Channel.from(50000, 100000, 200000)
+    bin_sizes = Channel.from(params.bins)
 
     
     genome_size = getGenomeSizes(ref_fa)
@@ -227,12 +213,12 @@ workflow
     
     sample_beds = convertBamToBed(bam)
 
-    pileup = bcftoolsPileup(ref_fa, bam.join(filtered_vcf))
+    // pileup = bcftoolsPileup(ref_fa, bam.join(filtered_vcf))
     vcf_beds = convertVcfToBed(filtered_vcf)
     closest_beds = findClosesBed(sample_beds.join(vcf_beds))
     hap_beds = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
 
     coverages = calcCoverage(genome_bins.combine(sample_beds.mix(hap_beds)))
     covs_by_bin = genome_bins.join(coverages.groupTuple())
-    cov_tables = createCoverageTables(covs_by_bin)
+    cov_tables = createCoverageTables(ref_fa.baseName, covs_by_bin)
 }
