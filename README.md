@@ -63,8 +63,8 @@ Random testing data are provided as a part of the package. The default test exec
 
 * Download the reference data using `sh ./DownloadRefData.sh`.
 * Execute based on the environment you are using:
-    * [Conda] `nextflow -C test_data.config run pipeline-ase.nf -with-conda ase-environment.yaml`
-    * [System] `nextflow -C test_data.config run pipeline-ase.nf`
+    * [Conda] `nextflow -C test_data.config run pipeline-cophasing.nf -with-conda pcp-env.yaml`
+    * [System] `nextflow -C test_data.config run pipeline-cophasing.nf`
 
 **NOTE:** The parameters for the execution are stored in the Nextflow configuration file `test_data.config`.
 
