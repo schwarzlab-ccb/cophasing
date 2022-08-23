@@ -1,1 +1,0 @@
-Rscript -e "devtools::install_bitbucket('schwarzlab/gamibhear')"
