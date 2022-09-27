@@ -33,7 +33,7 @@ process convertBamToBed
 
     script:
     """
-    bedtools bamtobed -i $bam > ${name}.bam.bed
+    bedtools bamtobed -i $bam |  sort -k1,1V -k2,2n -k3,3n > ${name}.bam.bed
     """
 }
 
@@ -204,7 +204,6 @@ workflow
     vcf = getVcfFiles(bam_names)
     ref_fa = file(params.fa)
     bin_sizes = Channel.from(params.bins)
-
     
     genome_size = getGenomeSizes(ref_fa)
     genome_bins = binGenome(genome_size, bin_sizes)

@@ -17,6 +17,7 @@ refs/
 
 # Data
 out/
+gam*
 
 # Node artifact files
 node_modules/
