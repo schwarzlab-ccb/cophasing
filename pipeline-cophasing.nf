@@ -2,7 +2,7 @@ nextflow.enable.dsl=2
 
 // Default parameter values
 params.bins = [50000, 100000, 200000]
-params.out_dir = "out"
+params.out = "out"
 params.debug_out = ""
 
 process filterUnphased 
@@ -159,7 +159,7 @@ process calcCoverage
 // find all coverage files and paste them by column with the resolution genomic bins
 process createCoverageTables
 {
-    publishDir params.out_dir, mode: "copy"
+    publishDir params.out, mode: "copy"
     
     input:
     val(genome_name)
