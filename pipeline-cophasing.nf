@@ -13,11 +13,13 @@ process filterUnphased
     tuple path(vcf) 
 
     output:
-    tuple path("${vcf.baseName}.recode.vcf") 
+    tuple path("${vcf.simpleName}.filtered.vcf.gz"), path("${vcf.simpleName}.filtered.vcf.gz.tbi") 
 
     script:
+    vcftool_type = "${vcf.name}".endsWith(".vcf.gz") ? "gzvcf" : "vcf"
     """
-    vcftools --gzvcf $vcf --out ${vcf.baseName} --phased --recode
+    vcftools --$vcftool_type $vcf --phased --recode --stdout | bgzip -c > ${vcf.simpleName}.filtered.vcf.gz
+    tabix ${vcf.simpleName}.filtered.vcf.gz
     """
 }
 
@@ -49,7 +51,7 @@ process convertVcfToBed
 
     script:
     """
-    cat $vcf | vcf2bed |  sort -k1,1V -k2,2n -k3,3n > ${name}.vcf.bed
+    cat $vcf | vcf2bed > ${name}.vcf.bed
     """
 }
 
@@ -59,14 +61,20 @@ process bcftoolsPileup
 
     input:
     path(ref_genome)
-    tuple val(name), path(bam), path(vcf)
+    tuple val(name), path(bam), path(vcf), path(tb)
     
     output:
-    tuple val(name), path("${name}.pileup")
+    tuple val(name), path("${name}.pileup.vcf.gz")
 
     script:
     """
-    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam | vcf-sort > ${name}.pileup 
+    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam | vcf-sort > ${name}.pileup.vcf 
+    bcftools query -l $vcf > samples.txt
+    echo " " >> samples.txt
+    bcftools query -l ${name}.pileup.vcf  > samples.txt
+    bgzip ${name}.pileup.vcf
+    tabix ${name}.pileup.vcf.gz
+    bcftools annotate -a $vcf -c FORMAT/GT ${name}.pileup.vcf.gz -S samples.txt 
     """
 }
 
@@ -203,7 +211,6 @@ workflow
     ref_fa = file(params.fa)
     vcf = file(params.vcf)
 
-    bam_names = bam.map{name, file -> name}
     bin_sizes = Channel.from(params.bins)    
 
     filtered_vcf = filterUnphased(vcf)
