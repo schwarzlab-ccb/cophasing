@@ -10,14 +10,14 @@ process filterUnphased
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
 
     input:
-    tuple val(name), path(vcf) 
+    tuple path(vcf) 
 
     output:
-    tuple val(name), path("${name}.recode.vcf") 
+    tuple path("${vcf.baseName}.recode.vcf") 
 
     script:
     """
-    vcftools --vcf $vcf --out $name --phased --recode
+    vcftools --gzvcf $vcf --out ${vcf.baseName} --phased --recode
     """
 }
 
@@ -66,9 +66,25 @@ process bcftoolsPileup
 
     script:
     """
-    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam > ${name}.pileup 
+    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam | vcf-sort > ${name}.pileup 
     """
 }
+
+process removeBiAllelic {    
+    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+
+    input:
+    tuple val(name), path(vcf)
+    
+    output:
+    tuple val(name), path("${name}.mono")
+
+    script:
+    """
+    bcftools filter -i "(FORMAT/AD[0:0] == 0 || FORMAT/AD[0:1] == 0) && FORMAT/AD[0:2] == 0" $vcf > ${name}.mono
+    """
+}
+
 
 process findClosesBed 
 {
@@ -180,40 +196,24 @@ process createCoverageTables
     """
 }
 
-def getVcfFiles(bam_names) 
-{
-    if (params.containsKey("vcf")) 
-    {
-        vcf_files = Channel.fromPath(params.vcf)
-        vcf_files.ifEmpty{error "No VCF files found matching the naming of the bam files."}
-        vcf = bam_names.combine(vcf_files)
-        vcf.ifEmpty{error "Failed to match VCF files onto BAM files."}
-    }
-    else 
-    {
-        vcf_filename = params.bam - ".bam" + ".vcf"
-        vcf = Channel.fromFilePairs(vcf_filename, size: 1)
-    }
-    return vcf
-}
 
 workflow 
 {
     bam = Channel.fromFilePairs(params.bam, size: 1)
-    bam_names = bam.map{name, file -> name}
-    vcf = getVcfFiles(bam_names)
     ref_fa = file(params.fa)
-    bin_sizes = Channel.from(params.bins)
-    
+    vcf = file(params.vcf)
+
+    bam_names = bam.map{name, file -> name}
+    bin_sizes = Channel.from(params.bins)    
+
+    filtered_vcf = filterUnphased(vcf)
+    pileup = bcftoolsPileup(ref_fa, bam.combine(filtered_vcf))
+    mono_allelic = removeBiAllelic(pileup)
+    vcf_beds = convertVcfToBed(mono_allelic)
+
+    sample_beds = convertBamToBed(bam)
     genome_size = getGenomeSizes(ref_fa)
     genome_bins = binGenome(genome_size, bin_sizes)
-    
-    filtered_vcf = filterUnphased(vcf)
-    
-    sample_beds = convertBamToBed(bam)
-
-    // pileup = bcftoolsPileup(ref_fa, bam.join(filtered_vcf))
-    vcf_beds = convertVcfToBed(filtered_vcf)
     closest_beds = findClosesBed(sample_beds.join(vcf_beds))
     hap_beds = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
 

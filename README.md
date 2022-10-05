@@ -5,18 +5,18 @@ Nextflow-based pipeline for cophasing of GAM reads.
 ## Pipeline
 
 ### Input:
-* GAM experiemt samples in BAM format
-* Reference genome in FASTA format
-* Known SNPs in VCF format
+1. GAM experiemt samples in BAM format
+2. Reference genome in FASTA format
+3. Known SNPs in VCF format. **NOTE**: The VCF file must be in plaintext (not compressed) and end with `.vcf`.
 
 ### Output
 A set of tables of the form `{genome_name}.{bin_size}.table` for different bin sizes with the number of reads per bin. The columns are:
-* `chrom`: chromosome name
-* `start`: start position of the bin
-* `stop`: the stop position of the bin
-* `{sample}`: the number of reads in the bin
-* `{sample_hap1}`: the number but for the first haplotype
-* `{sample_hap2}`: the number but for the second haplotype
+1. `chrom`: chromosome name
+2. `start`: start position of the bin
+3. `stop`: the stop position of the bin
+4. `{sample}`: the number of reads in the bin
+5. `{sample_hap1}`: the number but for the first haplotype
+6. `{sample_hap2}`: the number but for the second haplotype
 
 ### Process
 
