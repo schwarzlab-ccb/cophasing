@@ -4,6 +4,7 @@ nextflow.enable.dsl=2
 params.bins = [50000, 100000, 200000]
 params.out = "out"
 params.debug_out = ""
+params.cutoff = 0
 
 process filterUnphased 
 {
@@ -49,6 +50,7 @@ process convertVcfToBed
     output:
     tuple val(name), path("${name}.vcf.bed")
 
+// TODO here the phasing must be matched with the observed snips
     script:
     """
     cat $vcf | vcf2bed |  sort -k1,1V -k2,2n -k3,3n > ${name}.vcf.bed
@@ -211,7 +213,7 @@ workflow
     bin_sizes = Channel.from(params.bins)    
 
     filtered_vcf = filterUnphased(vcf)
-    combined = bam.combine(filtered_vcf)
+    combined = bam.combine(filtered_vcf)    
     pileup = bcftoolsPileup(ref_fa, combined)
     mono_allelic = removeBiAllelic(pileup)
     vcf_beds = convertVcfToBed(mono_allelic)
