@@ -51,7 +51,7 @@ process convertVcfToBed
 
     script:
     """
-    cat $vcf | vcf2bed > ${name}.vcf.bed
+    cat $vcf | vcf2bed |  sort -k1,1V -k2,2n -k3,3n > ${name}.vcf.bed
     """
 }
 
@@ -64,17 +64,14 @@ process bcftoolsPileup
     tuple val(name), path(bam), path(vcf), path(tb)
     
     output:
-    tuple val(name), path("${name}.pileup.vcf.gz")
+    tuple val(name), path("${name}.pileup.vcf")
 
     script:
     """
-    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam | vcf-sort > ${name}.pileup.vcf 
-    bcftools query -l $vcf > samples.txt
-    echo " " >> samples.txt
-    bcftools query -l ${name}.pileup.vcf  > samples.txt
-    bgzip ${name}.pileup.vcf
-    tabix ${name}.pileup.vcf.gz
-    bcftools annotate -a $vcf -c FORMAT/GT ${name}.pileup.vcf.gz -S samples.txt 
+    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam | vcf-sort | bgzip > ${name}.temp.vcf.gz 
+    tabix ${name}.temp.vcf.gz
+    echo `bcftools query -l $vcf` `bcftools query -l ${name}.temp.vcf.gz` > samples.txt
+    bcftools annotate -a $vcf -c FORMAT/GT ${name}.temp.vcf.gz -S samples.txt > ${name}.pileup.vcf
     """
 }
 
@@ -214,7 +211,8 @@ workflow
     bin_sizes = Channel.from(params.bins)    
 
     filtered_vcf = filterUnphased(vcf)
-    pileup = bcftoolsPileup(ref_fa, bam.combine(filtered_vcf))
+    combined = bam.combine(filtered_vcf)
+    pileup = bcftoolsPileup(ref_fa, combined)
     mono_allelic = removeBiAllelic(pileup)
     vcf_beds = convertVcfToBed(mono_allelic)
 
