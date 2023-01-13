@@ -5,6 +5,7 @@ params.bins = [50000, 100000, 200000]
 params.out = "out"
 params.debug_out = ""
 params.cutoff = 0
+params.min_depth = 10
 
 process filterUnphased 
 {
@@ -70,7 +71,7 @@ process bcftoolsPileup
 
     script:
     """
-    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam | vcf-sort | bgzip > ${name}.temp.vcf.gz 
+    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/DP,FORMAT/AD -O v $bam | vcf-sort | bgzip > ${name}.temp.vcf.gz 
     tabix ${name}.temp.vcf.gz
     echo `bcftools query -l $vcf` `bcftools query -l ${name}.temp.vcf.gz` > samples.txt
     if [ `wc -l < samples.txt` != 1 ]; then echo "there must be exactly one sample in the VCF ${vcf}"; exit 1; fi;
@@ -79,7 +80,7 @@ process bcftoolsPileup
 }
 
 // Keep only sites where are reads are allocated to one allele
-process removeBiAllelic {    
+process filterSites {    
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
 
     input:
@@ -87,10 +88,12 @@ process removeBiAllelic {
     
     output:
     tuple val(name), path("${name}.mono")
-
+    
     script:
+    filter_mono = "(FORMAT/AD[0:0] > 0 && FORMAT/AD[0:1] == 0) || (FORMAT/AD[0:0] == 0 && FORMAT/AD[0:2] == 0)"
+    filter_depth = "(FORMAT/DP[0:0] > $params.min_depth)"
     """
-    bcftools filter -i "(FORMAT/AD[0:0] > 0 && FORMAT/AD[0:1] == 0) || (FORMAT/AD[0:0] == 0 && FORMAT/AD[0:2] == 0)" $vcf > ${name}.mono
+    bcftools filter -i "$filter_mono && $filter_depth" $vcf > ${name}.mono
     """
 }
 
@@ -217,8 +220,8 @@ workflow
     filtered_vcf = filterUnphased(vcf)
     combined = bam.combine(filtered_vcf)    
     pileup = bcftoolsPileup(ref_fa, combined)
-    mono_allelic = removeBiAllelic(pileup)
-    vcf_beds = convertVcfToBed(mono_allelic)
+    filtered_pileup = filterSites(pileup)
+    vcf_beds = convertVcfToBed(filtered_pileup)
 
     sample_beds = convertBamToBed(bam)
     genome_size = getGenomeSizes(ref_fa)
