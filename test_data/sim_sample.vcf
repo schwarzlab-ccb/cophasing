@@ -1,0 +1,280 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##contig=<ID=chr1,length=31634>
+##contig=<ID=chr2,length=57861>
+##contig=<ID=chr3,length=34422>
+##contig=<ID=chr4,length=93835>
+##contig=<ID=chr5,length=75061>
+##contig=<ID=chr6,length=75400>
+##contig=<ID=chr7,length=10373>
+##contig=<ID=chr8,length=73826>
+##contig=<ID=chr9,length=80818>
+##contig=<ID=chr10,length=60201>
+##contig=<ID=chr11,length=6098>
+##contig=<ID=chr12,length=88095>
+##contig=<ID=chr13,length=26508>
+##contig=<ID=chr14,length=7937>
+##contig=<ID=chr15,length=86554>
+##contig=<ID=chr16,length=24687>
+##contig=<ID=chr17,length=32453>
+##contig=<ID=chr18,length=25134>
+##contig=<ID=chr19,length=74483>
+##contig=<ID=chr20,length=40482>
+##contig=<ID=chr21,length=94359>
+##contig=<ID=chr22,length=51801>
+##contig=<ID=chrX,length=48508>
+##contig=<ID=chrY,length=44330>
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency, for each ALT allele, in the same order as listed">
+##bcftools_concatVersion=1.9+htslib-1.9
+##bcftools_concatCommand=concat -o out/sim_sample.vcf -a out/sim_sample1.vcf.gz out/sim_sample2.vcf.gz; Date=Fri Jan 13 12:36:55 2023
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	test_sample
+chr1	450	.	C	T	.	.	AF=0.901993	GT	1|0
+chr1	602	.	G	T	.	.	AF=0.728398	GT	1|0
+chr1	852	.	A	G	.	.	AF=0.733962	GT	0|1
+chr1	951	.	C	T	.	.	AF=0.900241	GT	1|0
+chr1	1102	.	A	T	.	.	AF=0.689219	GT	0|1
+chr1	1201	.	A	G	.	.	AF=0.725676	GT	1|0
+chr1	1452	.	G	T	.	.	AF=0.91571	GT	1|0
+chr1	1855	.	T	C	.	.	AF=0.987587	GT	0|1
+chr1	1953	.	C	G	.	.	AF=0.651924	GT	1|0
+chr1	2105	.	A	C	.	.	AF=0.999573	GT	1|0
+chr1	2356	.	C	T	.	.	AF=0.790241	GT	1|0
+chr2	100	.	G	T	.	.	AF=0.797664	GT	0|1
+chr2	350	.	C	A	.	.	AF=0.769748	GT	0|1
+chr2	601	.	G	T	.	.	AF=0.80333	GT	0|1
+chr2	701	.	G	T	.	.	AF=0.889307	GT	0|1
+chr2	851	.	A	G	.	.	AF=0.608558	GT	0|1
+chr2	1102	.	C	A	.	.	AF=0.669196	GT	0|1
+chr2	1202	.	A	G	.	.	AF=0.549409	GT	1|0
+chr2	1353	.	C	G	.	.	AF=0.789818	GT	0|1
+chr2	1453	.	G	C	.	.	AF=0.886586	GT	1|0
+chr2	1604	.	T	A	.	.	AF=0.719614	GT	1|0
+chr2	1703	.	A	C	.	.	AF=0.791476	GT	1|0
+chr2	1854	.	T	C	.	.	AF=0.531149	GT	1|0
+chr2	1953	.	T	A	.	.	AF=0.610949	GT	1|0
+chr2	2104	.	G	C	.	.	AF=0.366065	GT	1|0
+chr2	2204	.	G	T	.	.	AF=0.934258	GT	1|0
+chr2	2354	.	A	G	.	.	AF=0.664689	GT	1|0
+chr3	100	.	C	T	.	.	AF=0.921762	GT	0|1
+chr3	350	.	G	T	.	.	AF=0.851183	GT	0|1
+chr3	601	.	A	G	.	.	AF=0.943926	GT	0|1
+chr3	851	.	G	A	.	.	AF=0.873643	GT	0|1
+chr3	1102	.	G	C	.	.	AF=0.860586	GT	1|0
+chr3	1604	.	C	T	.	.	AF=0.988851	GT	1|0
+chr3	1705	.	T	C	.	.	AF=0.719558	GT	1|0
+chr3	1955	.	C	A	.	.	AF=0.766826	GT	1|0
+chr3	2104	.	A	C	.	.	AF=0.945159	GT	1|0
+chr3	2354	.	C	G	.	.	AF=0.901293	GT	1|0
+chr4	450	.	C	T	.	.	AF=0.913282	GT	1|0
+chr4	601	.	C	T	.	.	AF=0.851924	GT	1|0
+chr4	852	.	A	G	.	.	AF=0.929706	GT	0|1
+chr4	1353	.	A	G	.	.	AF=0.846358	GT	0|1
+chr4	1451	.	G	C	.	.	AF=0.768152	GT	0|1
+chr4	1604	.	C	A	.	.	AF=0.658921	GT	0|1
+chr4	2203	.	C	A	.	.	AF=0.621424	GT	0|1
+chr5	100	.	C	T	.	.	AF=0.690911	GT	0|1
+chr5	200	.	A	C	.	.	AF=0.725047	GT	1|0
+chr5	351	.	C	T	.	.	AF=0.837305	GT	0|1
+chr5	702	.	T	C	.	.	AF=0.991498	GT	1|0
+chr5	853	.	A	G	.	.	AF=0.84633	GT	0|1
+chr5	1104	.	A	C	.	.	AF=0.545628	GT	1|0
+chr5	1202	.	C	G	.	.	AF=0.979362	GT	0|1
+chr5	1354	.	A	C	.	.	AF=0.742371	GT	1|0
+chr5	1453	.	C	T	.	.	AF=0.806731	GT	0|1
+chr5	1605	.	T	C	.	.	AF=0.927621	GT	1|0
+chr5	1856	.	G	C	.	.	AF=0.873428	GT	1|0
+chr5	2456	.	G	A	.	.	AF=0.795073	GT	1|0
+chr6	100	.	C	T	.	.	AF=0.829894	GT	1|0
+chr6	200	.	A	T	.	.	AF=0.925615	GT	1|0
+chr6	351	.	C	A	.	.	AF=0.959802	GT	1|0
+chr6	450	.	A	T	.	.	AF=0.899573	GT	1|0
+chr6	1352	.	G	A	.	.	AF=0.848387	GT	0|1
+chr6	1454	.	G	T	.	.	AF=0.881936	GT	1|0
+chr6	1602	.	C	A	.	.	AF=0.925704	GT	0|1
+chr6	1705	.	G	C	.	.	AF=0.817457	GT	1|0
+chr6	1955	.	T	G	.	.	AF=0.957117	GT	1|0
+chr6	2205	.	T	A	.	.	AF=0.974246	GT	1|0
+chr6	2455	.	G	T	.	.	AF=0.855539	GT	1|0
+chr7	351	.	T	G	.	.	AF=0.784385	GT	0|1
+chr7	450	.	C	T	.	.	AF=0.929895	GT	1|0
+chr7	601	.	C	A	.	.	AF=0.962558	GT	0|1
+chr7	852	.	T	A	.	.	AF=0.772042	GT	0|1
+chr7	952	.	C	G	.	.	AF=0.958512	GT	1|0
+chr7	1102	.	C	T	.	.	AF=0.874583	GT	0|1
+chr7	1203	.	T	A	.	.	AF=0.498022	GT	1|0
+chr7	1603	.	T	A	.	.	AF=0.893551	GT	0|1
+chr7	1853	.	A	C	.	.	AF=0.898421	GT	0|1
+chr7	1955	.	C	T	.	.	AF=0.924233	GT	1|0
+chr7	2103	.	C	A	.	.	AF=0.846604	GT	1|0
+chr7	2206	.	C	T	.	.	AF=0.902054	GT	1|0
+chr7	2457	.	G	T	.	.	AF=0.860519	GT	1|0
+chr8	100	.	T	C	.	.	AF=0.765743	GT	1|0
+chr8	200	.	A	T	.	.	AF=0.781825	GT	1|0
+chr8	350	.	A	T	.	.	AF=0.985076	GT	1|0
+chr8	852	.	G	A	.	.	AF=0.530029	GT	0|1
+chr8	952	.	A	G	.	.	AF=0.878641	GT	1|0
+chr8	1202	.	T	C	.	.	AF=0.9145	GT	1|0
+chr8	1452	.	T	A	.	.	AF=0.992577	GT	1|0
+chr8	1854	.	A	C	.	.	AF=0.979331	GT	0|1
+chr8	2203	.	G	A	.	.	AF=0.691983	GT	1|0
+chr8	2454	.	C	A	.	.	AF=0.826846	GT	1|0
+chr9	351	.	G	C	.	.	AF=0.88454	GT	0|1
+chr9	1202	.	T	G	.	.	AF=0.8902	GT	1|0
+chr9	1856	.	G	A	.	.	AF=0.76147	GT	0|1
+chr9	1954	.	T	A	.	.	AF=0.81673	GT	1|0
+chr9	2107	.	C	T	.	.	AF=0.47834	GT	0|1
+chr9	2205	.	C	T	.	.	AF=0.836023	GT	1|0
+chr9	2358	.	A	C	.	.	AF=0.743527	GT	0|1
+chr10	200	.	G	C	.	.	AF=0.807132	GT	0|1
+chr10	351	.	C	T	.	.	AF=0.968533	GT	1|0
+chr10	450	.	T	A	.	.	AF=0.88229	GT	0|1
+chr10	602	.	A	T	.	.	AF=0.920435	GT	0|1
+chr10	701	.	G	C	.	.	AF=0.812942	GT	1|0
+chr10	1103	.	G	C	.	.	AF=0.842378	GT	0|1
+chr10	1202	.	T	G	.	.	AF=0.582335	GT	0|1
+chr10	1452	.	A	G	.	.	AF=0.684112	GT	0|1
+chr10	1855	.	A	T	.	.	AF=0.61994	GT	0|1
+chr10	2355	.	G	A	.	.	AF=0.892251	GT	0|1
+chr11	200	.	A	T	.	.	AF=0.67952	GT	0|1
+chr11	351	.	G	T	.	.	AF=0.778906	GT	0|1
+chr11	450	.	C	G	.	.	AF=0.826513	GT	0|1
+chr11	601	.	C	G	.	.	AF=0.894043	GT	0|1
+chr11	700	.	T	A	.	.	AF=0.782403	GT	1|0
+chr11	851	.	C	A	.	.	AF=0.722439	GT	0|1
+chr11	951	.	T	A	.	.	AF=0.723256	GT	1|0
+chr11	1101	.	A	G	.	.	AF=0.755615	GT	0|1
+chr11	1202	.	G	A	.	.	AF=0.686347	GT	1|0
+chr11	1452	.	G	A	.	.	AF=0.55086	GT	1|0
+chr11	1603	.	A	G	.	.	AF=0.717279	GT	0|1
+chr11	1703	.	A	T	.	.	AF=0.922227	GT	0|1
+chr11	2204	.	A	G	.	.	AF=0.636862	GT	0|1
+chr11	2454	.	A	C	.	.	AF=0.913481	GT	0|1
+chr12	100	.	A	T	.	.	AF=0.600938	GT	0|1
+chr12	200	.	T	G	.	.	AF=0.826208	GT	0|1
+chr12	350	.	C	A	.	.	AF=0.901557	GT	0|1
+chr12	451	.	T	G	.	.	AF=0.854051	GT	0|1
+chr12	1201	.	T	G	.	.	AF=0.90077	GT	0|1
+chr12	1703	.	G	T	.	.	AF=0.672795	GT	0|1
+chr12	1953	.	G	T	.	.	AF=0.871537	GT	0|1
+chr12	2103	.	T	A	.	.	AF=0.877675	GT	0|1
+chr12	2204	.	T	A	.	.	AF=0.789851	GT	0|1
+chr12	2354	.	C	T	.	.	AF=0.957542	GT	0|1
+chr12	2455	.	A	C	.	.	AF=0.779246	GT	0|1
+chr13	200	.	G	A	.	.	AF=0.928959	GT	0|1
+chr13	351	.	G	A	.	.	AF=0.87342	GT	0|1
+chr13	451	.	A	G	.	.	AF=0.676067	GT	0|1
+chr13	602	.	G	T	.	.	AF=0.696021	GT	0|1
+chr13	701	.	T	G	.	.	AF=0.609472	GT	0|1
+chr13	1104	.	G	C	.	.	AF=0.615214	GT	0|1
+chr13	1202	.	G	T	.	.	AF=0.859035	GT	0|1
+chr13	1453	.	C	G	.	.	AF=0.805548	GT	0|1
+chr13	1954	.	G	A	.	.	AF=0.678074	GT	0|1
+chr13	2106	.	T	G	.	.	AF=0.943725	GT	0|1
+chr13	2204	.	C	G	.	.	AF=0.993695	GT	0|1
+chr14	100	.	T	A	.	.	AF=0.994811	GT	1|0
+chr14	200	.	A	G	.	.	AF=0.674907	GT	0|1
+chr14	351	.	A	G	.	.	AF=0.716378	GT	1|0
+chr14	602	.	C	T	.	.	AF=0.922105	GT	1|0
+chr14	1203	.	C	G	.	.	AF=0.85582	GT	0|1
+chr14	1703	.	G	T	.	.	AF=0.765835	GT	0|1
+chr14	1856	.	G	T	.	.	AF=0.828453	GT	1|0
+chr14	2107	.	C	G	.	.	AF=0.695524	GT	1|0
+chr14	2358	.	A	G	.	.	AF=0.910587	GT	1|0
+chr14	2454	.	A	T	.	.	AF=0.857949	GT	0|1
+chr15	100	.	A	C	.	.	AF=0.493544	GT	1|0
+chr15	200	.	C	A	.	.	AF=0.793991	GT	0|1
+chr15	350	.	A	T	.	.	AF=0.784702	GT	1|0
+chr15	600	.	C	G	.	.	AF=0.721936	GT	1|0
+chr15	702	.	G	A	.	.	AF=0.841503	GT	0|1
+chr15	851	.	G	T	.	.	AF=0.824142	GT	1|0
+chr15	1602	.	G	T	.	.	AF=0.831053	GT	1|0
+chr15	1853	.	C	G	.	.	AF=0.814433	GT	1|0
+chr15	2204	.	G	A	.	.	AF=0.853626	GT	0|1
+chr15	2353	.	T	A	.	.	AF=0.824933	GT	1|0
+chr15	2454	.	C	T	.	.	AF=0.915189	GT	0|1
+chr16	200	.	T	G	.	.	AF=0.633195	GT	0|1
+chr16	450	.	A	C	.	.	AF=0.856405	GT	1|0
+chr16	853	.	C	G	.	.	AF=0.830644	GT	1|0
+chr16	950	.	T	C	.	.	AF=0.502677	GT	1|0
+chr16	1200	.	A	T	.	.	AF=0.803629	GT	1|0
+chr16	1605	.	T	C	.	.	AF=0.829341	GT	1|0
+chr16	1855	.	G	A	.	.	AF=0.795861	GT	1|0
+chr16	2106	.	T	A	.	.	AF=0.747401	GT	0|1
+chr17	100	.	C	T	.	.	AF=0.89125	GT	0|1
+chr17	351	.	C	A	.	.	AF=0.749605	GT	1|0
+chr17	701	.	T	A	.	.	AF=0.674388	GT	0|1
+chr17	1103	.	A	C	.	.	AF=0.742265	GT	1|0
+chr17	1605	.	T	C	.	.	AF=0.674451	GT	0|1
+chr17	1703	.	G	A	.	.	AF=0.35663	GT	0|1
+chr17	1953	.	T	A	.	.	AF=0.937947	GT	0|1
+chr17	2204	.	C	A	.	.	AF=0.929516	GT	0|1
+chr17	2355	.	T	C	.	.	AF=0.789304	GT	0|1
+chr17	2455	.	C	T	.	.	AF=0.848747	GT	0|1
+chr18	100	.	T	G	.	.	AF=0.549678	GT	0|1
+chr18	200	.	T	C	.	.	AF=0.679322	GT	1|0
+chr18	350	.	T	A	.	.	AF=0.886729	GT	0|1
+chr18	601	.	C	T	.	.	AF=0.812747	GT	1|0
+chr18	700	.	C	G	.	.	AF=0.99784	GT	1|0
+chr18	852	.	T	A	.	.	AF=0.734616	GT	0|1
+chr18	950	.	G	T	.	.	AF=0.887506	GT	1|0
+chr18	1353	.	G	T	.	.	AF=0.841035	GT	0|1
+chr18	1452	.	T	A	.	.	AF=0.629977	GT	1|0
+chr18	1604	.	G	C	.	.	AF=0.915222	GT	1|0
+chr18	1855	.	T	A	.	.	AF=0.785473	GT	0|1
+chr18	1954	.	C	T	.	.	AF=0.785689	GT	1|0
+chr18	2106	.	A	C	.	.	AF=0.548704	GT	1|0
+chr19	350	.	G	A	.	.	AF=0.749552	GT	1|0
+chr19	701	.	G	T	.	.	AF=0.908172	GT	1|0
+chr19	851	.	C	T	.	.	AF=0.681337	GT	1|0
+chr19	1202	.	C	G	.	.	AF=0.619587	GT	1|0
+chr19	1352	.	A	T	.	.	AF=0.582617	GT	1|0
+chr19	1453	.	G	T	.	.	AF=0.991699	GT	1|0
+chr19	1603	.	T	A	.	.	AF=0.503366	GT	1|0
+chr19	1704	.	C	T	.	.	AF=0.987393	GT	1|0
+chr19	2455	.	C	A	.	.	AF=0.848189	GT	1|0
+chr20	602	.	A	T	.	.	AF=0.946159	GT	1|0
+chr20	701	.	A	C	.	.	AF=0.959213	GT	0|1
+chr20	1354	.	A	G	.	.	AF=0.681329	GT	1|0
+chr20	1605	.	G	T	.	.	AF=0.659601	GT	1|0
+chr20	1703	.	C	A	.	.	AF=0.665101	GT	0|1
+chr20	1855	.	C	A	.	.	AF=0.769349	GT	1|0
+chr20	1954	.	C	G	.	.	AF=0.797006	GT	0|1
+chr20	2105	.	T	G	.	.	AF=0.870638	GT	0|1
+chr20	2356	.	A	C	.	.	AF=0.822343	GT	0|1
+chr21	350	.	A	G	.	.	AF=0.805552	GT	0|1
+chr21	600	.	T	A	.	.	AF=0.897928	GT	0|1
+chr21	702	.	T	G	.	.	AF=0.770834	GT	0|1
+chr21	850	.	G	A	.	.	AF=0.656013	GT	1|0
+chr21	953	.	A	G	.	.	AF=0.904621	GT	0|1
+chr21	1204	.	G	T	.	.	AF=0.983184	GT	1|0
+chr21	1352	.	G	C	.	.	AF=0.610355	GT	0|1
+chr21	1602	.	A	T	.	.	AF=0.845034	GT	0|1
+chr21	1705	.	G	A	.	.	AF=0.91831	GT	1|0
+chr21	1853	.	G	A	.	.	AF=0.629099	GT	0|1
+chr21	2205	.	T	C	.	.	AF=0.929733	GT	1|0
+chr21	2354	.	G	C	.	.	AF=0.604007	GT	0|1
+chr22	200	.	C	G	.	.	AF=0.822706	GT	1|0
+chr22	701	.	C	A	.	.	AF=0.988522	GT	1|0
+chr22	1103	.	C	A	.	.	AF=0.694669	GT	0|1
+chr22	1202	.	G	A	.	.	AF=0.938324	GT	0|1
+chr22	1354	.	G	C	.	.	AF=0.974211	GT	0|1
+chr22	1702	.	G	T	.	.	AF=0.961212	GT	0|1
+chr22	2356	.	G	A	.	.	AF=0.856286	GT	0|1
+chrX	200	.	G	T	.	.	AF=0.618612	GT	0|1
+chrX	350	.	G	T	.	.	AF=0.612136	GT	0|1
+chrX	851	.	A	T	.	.	AF=0.680036	GT	1|0
+chrX	1101	.	G	A	.	.	AF=0.892069	GT	0|1
+chrX	1201	.	A	G	.	.	AF=0.88155	GT	0|1
+chrX	1952	.	T	G	.	.	AF=0.93795	GT	1|0
+chrX	2103	.	C	G	.	.	AF=0.818294	GT	0|1
+chrX	2203	.	A	C	.	.	AF=0.777903	GT	0|1
+chrX	2453	.	A	T	.	.	AF=0.861345	GT	0|1
+chrY	100	.	A	T	.	.	AF=0.771047	GT	0|1
+chrY	351	.	T	A	.	.	AF=0.855752	GT	0|1
+chrY	602	.	G	C	.	.	AF=0.695514	GT	0|1
+chrY	951	.	A	T	.	.	AF=0.764651	GT	0|1
+chrY	1102	.	A	G	.	.	AF=0.78047	GT	0|1
+chrY	1352	.	T	G	.	.	AF=0.711932	GT	1|0
+chrY	2103	.	C	A	.	.	AF=0.850251	GT	1|0
+chrY	2205	.	C	T	.	.	AF=0.780752	GT	0|1

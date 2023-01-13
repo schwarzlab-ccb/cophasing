@@ -16,7 +16,8 @@ notebooks/
 refs/
 
 # Data
-out/
+test_out/
+test_debug/
 gam*
 
 # Node artifact files

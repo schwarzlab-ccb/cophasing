@@ -36,7 +36,7 @@ process convertBamToBed
 
     script:
     """
-    bedtools bamtobed -i $bam |  sort -k1,1V -k2,2n -k3,3n > ${name}.bam.bed
+    bedtools bamtobed -i $bam | sort -k1,1 -k2,2n > ${name}.bam.bed
     """
 }
 
@@ -53,7 +53,7 @@ process convertVcfToBed
 // TODO here the phasing must be matched with the observed snips
     script:
     """
-    cat $vcf | vcf2bed |  sort -k1,1V -k2,2n -k3,3n > ${name}.vcf.bed
+    cat $vcf | vcf2bed | sort -k1,1 -k2,2nn > ${name}.vcf.bed
     """
 }
 
@@ -73,6 +73,7 @@ process bcftoolsPileup
     bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/AD,INFO/AD -O v $bam | vcf-sort | bgzip > ${name}.temp.vcf.gz 
     tabix ${name}.temp.vcf.gz
     echo `bcftools query -l $vcf` `bcftools query -l ${name}.temp.vcf.gz` > samples.txt
+    if [ `wc -l < samples.txt` != 1 ]; then echo "there must be exactly one sample in the VCF ${vcf}"; exit 1; fi;
     bcftools annotate -a $vcf -c FORMAT/GT ${name}.temp.vcf.gz -S samples.txt > ${name}.pileup.vcf
     """
 }
