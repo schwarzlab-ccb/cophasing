@@ -5,8 +5,8 @@ nextflow.enable.dsl=2
 params.bins = [50000, 100000, 200000]
 params.out = "out"
 params.debug_out = ""
-params.cutoff = 0
-params.min_depth = 10
+params.cutoff = 1000 // Maximum distance between a read and a variant to be considered for analysis
+params.min_depth = 10 // Minimum required read depth per variant to be considered for analysis
 
 process filterUnphased 
 {
@@ -116,7 +116,7 @@ process findClosesBed
     
     script:
     """
-    bedtools closest -d -t all -k 1 -a $bam_bed -b $vcf_bed > ${name}.closest.bed
+    bedtools closest -d -t all -k 1 -a $bam_bed -b $vcf_bed | awk '\$NF < $params.cutoff' > ${name}.closest.bed
     """
 }
 
