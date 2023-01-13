@@ -53,7 +53,7 @@ process convertVcfToBed
 // TODO here the phasing must be matched with the observed snips
     script:
     """
-    cat $vcf | vcf2bed | awk -F '\t' 'BEGIN {OFS="\t"} { if (match(\$7, "[TGCA]")) print }' | sort -k1,1 -k2,2nn > ${name}.vcf.bed
+    cat $vcf | vcf2bed | sort -k1,1 -k2,2nn > ${name}.vcf.bed
     """
 }
 
@@ -74,7 +74,7 @@ process bcftoolsPileup
     tabix ${name}.temp.vcf.gz
     echo `bcftools query -l $vcf` `bcftools query -l ${name}.temp.vcf.gz` > samples.txt
     if [ `wc -l < samples.txt` != 1 ]; then echo "there must be exactly one sample in the VCF ${vcf}"; exit 1; fi;
-    bcftools annotate -a $vcf -c FORMAT/GT ${name}.temp.vcf.gz -S samples.txt > ${name}.pileup.vcf
+    bcftools annotate -a $vcf -c ALT,FORMAT/GT ${name}.temp.vcf.gz -S samples.txt > ${name}.pileup.vcf
     """
 }
 
@@ -90,7 +90,7 @@ process removeBiAllelic {
 
     script:
     """
-    bcftools filter -i "(FORMAT/AD[0:0] == 0 || FORMAT/AD[0:1] == 0) && FORMAT/AD[0:2] == 0" $vcf > ${name}.mono
+    bcftools filter -i "(FORMAT/AD[0:0] > 0 && FORMAT/AD[0:1] == 0) || (FORMAT/AD[0:0] == 0 && FORMAT/AD[0:2] == 0)" $vcf > ${name}.mono
     """
 }
 
