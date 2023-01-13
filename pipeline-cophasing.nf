@@ -54,7 +54,7 @@ process convertVcfToBed
 // TODO here the phasing must be matched with the observed snips
     script:
     """
-    cat $vcf | vcf2bed | sort -k1,1 -k2,2nn > ${name}.vcf.bed
+    cat $vcf | vcf2bed | cut -f1-3,6-7,10-11 | sort -k1,1 -k2,2nn > ${name}.vcf.bed
     """
 }
 
