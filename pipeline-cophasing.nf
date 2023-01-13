@@ -1,5 +1,6 @@
 nextflow.enable.dsl=2
 
+// IMPROVEMENT: consider monoallelic if ratio more than 10:1 (less strict)
 // Default parameter values
 params.bins = [50000, 100000, 200000]
 params.out = "out"
@@ -51,10 +52,15 @@ process convertVcfToBed
     output:
     tuple val(name), path("${name}.vcf.bed")
 
-// TODO here the phasing must be matched with the observed snips
     script:
+    obs_ref = ":[[:digit:]]+,0" // OBSERVED REFERENCE
+    obs_alt = ":0,[[:digit:]]+,0" // OBSERVED ALTERNATIVE
     """
-    cat $vcf | vcf2bed | cut -f1-3,6-7,10-11 | sort -k1,1 -k2,2nn > ${name}.vcf.bed
+    cat $vcf | vcf2bed | cut -f1-3,11 | sort -k1,1 -k2,2nn > ${name}.vcf.bed    
+    sed -E -i "s/0\\|1.*${obs_ref}/hap1/g" ${name}.vcf.bed 
+    sed -E -i "s/1\\|0.*${obs_alt}/hap1/g" ${name}.vcf.bed 
+    sed -E -i "s/0\\|1.*${obs_alt}/hap2/g" ${name}.vcf.bed 
+    sed -E -i "s/1\\|0.*${obs_ref}/hap2/g" ${name}.vcf.bed 
     """
 }
 
@@ -110,7 +116,7 @@ process findClosesBed
     
     script:
     """
-    bedtools closest -d -t all -k 2 -a $bam_bed -b $vcf_bed > ${name}.closest.bed
+    bedtools closest -d -t all -k 1 -a $bam_bed -b $vcf_bed > ${name}.closest.bed
     """
 }
 
@@ -125,10 +131,8 @@ process splitBamFilesToHaps
     tuple val("${name}_${hap}"), path("${name}_${hap}.bam.bed")
     
     script:
-    // TODO: Check if this is correct splitting!   
-    filter = ("${hap}" == "hap1") ?  "1|0" : "0|1"
     """
-    grep -F '$filter' $closest_bed | cut -f4 > ${name}.${hap}.bed.list
+    grep -F '$hap' $closest_bed | cut -f4 > ${name}.${hap}.bed.list
     gatk FilterSamReads -I $bam -O ${name}_${hap}.bam -READ_LIST_FILE ${name}.${hap}.bed.list -FILTER includeReadList    
     bedtools bamtobed -i ${name}_${hap}.bam > "${name}_${hap}.bam.bed"
     """
