@@ -120,6 +120,7 @@ process findClosesBed
     """
 }
 
+// TODO: This should be improved - currently the original reads are filtered by info in the closest.bed, but the file itself could be used
 process splitBamFilesToHaps 
 {
     publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
@@ -215,25 +216,31 @@ process createCoverageTables
 
 workflow 
 {
+    // Inputs
     bam = Channel.fromFilePairs(params.bam, size: 1)
     ref_fa = file(params.fa)
     vcf = file(params.vcf)
-
     bin_sizes = Channel.from(params.bins)    
 
+    // Create and filter pileup to obtain phased variant sites observed in the reads
     filtered_vcf = filterUnphased(vcf)
     combined = bam.combine(filtered_vcf)    
     pileup = bcftoolsPileup(ref_fa, combined)
     filtered_pileup = filterSites(pileup)
     vcf_beds = convertVcfToBed(filtered_pileup)
 
-    sample_beds = convertBamToBed(bam)
+    // Calculate bins
     genome_size = getGenomeSizes(ref_fa)
     genome_bins = binGenome(genome_size, bin_sizes)
+
+    // Split reads into haplotypes 
+    sample_beds = convertBamToBed(bam)
     closest_beds = findClosesBed(sample_beds.join(vcf_beds))
     hap_beds = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
 
-    coverages = calcCoverage(genome_bins.combine(sample_beds.mix(hap_beds)))
+    // Calculate coverage for each sample and bin
+    window_sample_pairs = genome_bins.combine(sample_beds.mix(hap_beds))
+    coverages = calcCoverage(window_sample_pairs)
     covs_by_bin = genome_bins.join(coverages.groupTuple())
     cov_tables = createCoverageTables(ref_fa.baseName, covs_by_bin)
 }

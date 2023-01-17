@@ -33,6 +33,8 @@ A set of tables of the form `{genome_name}.{bin_size}.table` for different bin s
 2. calculate coverage files of all split GAM samples for each haplotype,
 3. combine coverage files of all samples into one coverage table, per resolution
 
+The coverated table describes the number of **bases** covered by reads in each window, therefore it is possible that the sum of coverage from both haplotypes is higher than the total number of bases covered in a window, as some bases may be covered by both haplotypes.
+
 ![Pipeline-Cophasing](./doc/pipeline_cophasing_chart.png)
 
 ## Requirements:
