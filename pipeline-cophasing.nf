@@ -6,7 +6,7 @@ params.bins = [50000, 100000, 200000]
 params.out = "out"
 params.debug_out = ""
 params.cutoff = 1000 // Maximum distance between a read and a variant to be considered for analysis
-params.min_depth = 10 // Minimum required read depth per variant to be considered for analysis
+params.min_depth = 1 // Minimum required read depth per variant to be considered for analysis
 
 process filterUnphased 
 {

@@ -5,9 +5,9 @@ Nextflow-based pipeline for cophasing of GAM reads.
 ## Pipeline
 
 ### Input:
-1. GAM experiemt samples in BAM format
-2. Reference genome in FASTA format
-3. Known SNPs in VCF format. **NOTE**: The VCF file must be in plaintext (not compressed) and end with `.vcf`.
+1. GAM experiemt samples in the BAM format,
+2. Reference genome in the FASTA format,
+3. **Phased** SNPs the in VCF format.
 
 ### Output
 A set of tables of the form `{genome_name}.{bin_size}.table` for different bin sizes with the number of reads per bin. The columns are:
@@ -36,21 +36,12 @@ A set of tables of the form `{genome_name}.{bin_size}.table` for different bin s
 ![Pipeline-Cophasing](./doc/pipeline_cophasing_chart.png)
 
 ## Requirements:
-You can skip installing the tools if you use conda with the provided environment (see below).
-
-Requirements:
-* java-jre
-* nextflow
-* bedtools
-* bfctools
-* vcftools
-* samtools
-* bedops
-* gatk4
+Use the provided conda environment file `pcp-env.yaml` to install all the required software.
 
 ## Execution
 
-To execture run 
+To execure run:
+
 `nextflow run pipeline-cophasing.nf [parameters]`
 
 ### Output
@@ -59,12 +50,9 @@ By default the results are written to the `./out` folder.
 
 ### Test run
 
-Random testing data are provided as a part of the package. The default test execution can be done as following:
+Random testing data are provided as a part of the package. Run the following command to test the pipeline:
 
-* Download the reference data using `sh ./DownloadRefData.sh`.
-* Execute based on the environment you are using:
-    * [Conda] `nextflow -C test_data.config run pipeline-cophasing.nf -with-conda pcp-env.yaml`
-    * [System] `nextflow -C test_data.config run pipeline-cophasing.nf`
+`nextflow run pipeline-cophasing.nf -c test_data.config` 
 
 **NOTE:** The parameters for the execution are stored in the Nextflow configuration file `test_data.config`.
 
@@ -73,20 +61,15 @@ Random testing data are provided as a part of the package. The default test exec
 #### Mandatory
 * `--fa path` reference file either as `.fa`  or `.fa.gz`.
 * `--bam path` alignment files either as `.bam` or `.sam`. This can be a glob pattern (e.g. `sample*.bam`). All files matching the pattern are used then.
+*  `--vcf path` variant call files either as `.vcf` or `.vcf.gz`. Must contain phased GT information.
 
-**NOTE:** Read and variants are aligned by name. For example `sample5.bam` is matched to `sample5.vcf`. If you have single vcf for all samples, use the `vcf` parameter detailed below.
+**Note**: GATK requires `.gz` files to be compressed with `bgzip`, not `gzip`.
 
 #### Default 
 * `--bins [int]` the bin sizes to be used, `default=[50000, 100000, 200000]`,
-* `--vcf path` variant call files either as `.vcf` or `.vcf.gz`. This can be a glob pattern (e.g. `sample*.vcf`), `default={bam_filè}.vcf` for each bam file provided.
-* `--out path` a path to a folder where the output is stored, `default=./out`.
-
-## Input data 
-
-Note that GATK requires `.gz` files to be compressed with `bgzip`, not `gzip`.
-
-#### Tested HG38 version
-Downloaded from: `https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz`
+* `--out path` a path to a folder where the output is stored, `default=./out`,
+* `--min_depth int` a minimum read depth per SNP to be included `default=1`,
+* `--cutoff int` maximum distance from a read to a closest so that the read is still matched to the SNP `default=1000`,
 
 ## Contact
 Email questions, feature requests and bug reports to **Adam Streck, adam.streck@mdc-berlin.de**.
