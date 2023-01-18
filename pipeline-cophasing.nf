@@ -133,9 +133,7 @@ process splitBamFilesToHaps
     
     script:
     """
-    grep -F '$hap' $closest_bed | cut -f4 > ${name}.${hap}.bed.list
-    gatk FilterSamReads -I $bam -O ${name}_${hap}.bam -READ_LIST_FILE ${name}.${hap}.bed.list -FILTER includeReadList    
-    bedtools bamtobed -i ${name}_${hap}.bam > "${name}_${hap}.bam.bed"
+    grep -F '$hap' $closest_bed | cut -f1-4,10 > ${name}_${hap}.bam.bed
     """
 }
 
