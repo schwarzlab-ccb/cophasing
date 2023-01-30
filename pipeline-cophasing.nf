@@ -15,7 +15,7 @@ process filterUnphased
     publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
-    tuple path(vcf) 
+    path(vcf) 
 
     output:
     tuple path("${vcf.simpleName}.filtered.vcf.gz"), path("${vcf.simpleName}.filtered.vcf.gz.tbi") 
