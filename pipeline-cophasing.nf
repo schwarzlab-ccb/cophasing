@@ -8,6 +8,7 @@ params.out = "out" // Output directory containing the results
 params.debug_out = "" // If set, will output intermediate files to this directory
 params.cutoff = 0 // Maximum distance between a read and a variant to be considered for analysis
 params.min_depth = 1 // Minimum required read depth per variant to be considered for analysis
+params.name = "" // Will default to the name of the FA file if not set
 
 process filterUnphased 
 {
