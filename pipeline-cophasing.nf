@@ -117,7 +117,7 @@ process findClosesBed
     
     script:
     """
-    bedtools closest -d -t all -k 1 -a $bam_bed -b $vcf_bed | awk '\$NF < $params.cutoff' > ${name}.closest.bed
+    bedtools closest -d -t all -k 1 -a $bam_bed -b $vcf_bed | awk '\$NF <= $params.cutoff' > ${name}.closest.bed
     """
 }
 
