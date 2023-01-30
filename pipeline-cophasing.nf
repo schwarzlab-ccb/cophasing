@@ -10,7 +10,7 @@ params.min_depth = 1 // Minimum required read depth per variant to be considered
 
 process filterUnphased 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple path(vcf) 
@@ -28,7 +28,7 @@ process filterUnphased
 
 process convertBamToBed 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(bam) 
@@ -44,7 +44,7 @@ process convertBamToBed
 
 process convertVcfToBed 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(vcf) 
@@ -66,7 +66,7 @@ process convertVcfToBed
 
 process bcftoolsPileup 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     path(ref_genome)
@@ -87,7 +87,7 @@ process bcftoolsPileup
 
 // Keep only sites where are reads are allocated to one allele
 process filterSites {    
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(vcf)
@@ -106,7 +106,7 @@ process filterSites {
 
 process findClosesBed 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(bam_bed), path(vcf_bed) 
@@ -123,7 +123,7 @@ process findClosesBed
 // TODO: This should be improved - currently the original reads are filtered by info in the closest.bed, but the file itself could be used
 process splitBamFilesToHaps 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(bam), path(closest_bed), val(hap)
@@ -139,7 +139,7 @@ process splitBamFilesToHaps
 
 process getGenomeSizes 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     path(ref_genome)
@@ -156,7 +156,7 @@ process getGenomeSizes
 
 process binGenome 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     path(genome_sizes)
@@ -173,7 +173,7 @@ process binGenome
 
 process calcCoverage
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
     
     input:
     tuple val(bin), path(bin_bed), val(name), path(read_bed)
