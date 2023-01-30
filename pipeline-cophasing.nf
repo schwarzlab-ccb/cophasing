@@ -180,7 +180,7 @@ process calcCoverage
     tuple val(bin), path(bin_bed), val(name), path(read_bed)
     
     output:
-    tuple val(bin), val(name), path("${name}.${bin}.cov")
+    tuple val("${bin}.${name[-4..-1]}"), val(name), path("${name}.${bin}.cov")
     
     script:
     """
@@ -205,13 +205,13 @@ process createCoverageTables
     names.sort()
     cov_files = "$covs".split(" ");
     cov_files.sort()
-    header = "chrom\tstart\tstop\t" + names.join("\t")
+    header = "chrom\tstart\tstop\t" + names.collect{it[0..-6]}.join("\t") // remove the haplotype from the sample name
+    table_file = "${genome_name}.${bin}.table"
     """
-    echo -e \"$header\" > ${genome_name}.${bin}.table
-    paste $genome_bin ${cov_files.join(" ")} >> ${genome_name}.${bin}.table
+    echo -e \"$header\" > ${table_file}
+    paste $genome_bin ${cov_files.join(" ")} >> ${table_file}
     """
 }
-
 
 workflow 
 {
@@ -235,12 +235,15 @@ workflow
     // Split reads into haplotypes 
     sample_beds = convertBamToBed(bam)
     closest_beds = findClosesBed(sample_beds.join(vcf_beds))
+    named_beds = sample_beds.map { it -> [it[0] + "_both", it[1]]}
     hap_beds = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
+    all_beds = named_beds.mix(hap_beds)
 
     // Calculate coverage for each sample and bin
-    window_sample_pairs = genome_bins.combine(sample_beds.mix(hap_beds))
+    window_sample_pairs = genome_bins.combine(all_beds)
     coverages = calcCoverage(window_sample_pairs)
-    covs_by_bin = genome_bins.join(coverages.groupTuple())
+    tables = genome_bins.combine(Channel.from(["both", "hap1", "hap2"])).map { it -> [it[0] + "." + it[2], it[1]] }
+    covs_by_bin = tables.join(coverages.groupTuple())
     output_name = params.name != "" ? params.name : ref_fa.baseName
     cov_tables = createCoverageTables(output_name, covs_by_bin)
 }

@@ -10,13 +10,11 @@ Nextflow-based pipeline for cophasing of GAM reads.
 3. **Phased** SNPs the in VCF format.
 
 ### Output
-A set of tables of the form `{genome_name}.{bin_size}.table` for different bin sizes with the number of reads per bin. The columns are:
+A set of tables of the form `{genome_name}.{bin_size}.{hap}.table` for different bin sizes with the number of reads per bin per `sample`. Haplotype `hap` is either `hap1`, `hap2`, or `both`.  The columns are:
 1. `chrom`: chromosome name
 2. `start`: start position of the bin
 3. `stop`: the stop position of the bin
-4. `{sample}`: the number of reads in the bin
-5. `{sample_hap1}`: the number but for the first haplotype
-6. `{sample_hap2}`: the number but for the second haplotype
+4. `[sample]`: the number of reads in the bing for each sample
 
 ### Process
 
