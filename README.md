@@ -68,10 +68,11 @@ Random testing data are provided as a part of the package. Run the following com
 **Note**: GATK requires `.gz` files to be compressed with `bgzip`, not `gzip`.
 
 #### Default 
+* `--name string` the prefix that will be given to the samples, `default=<the name of the reference file>`,
 * `--bins [int]` the bin sizes to be used, `default=[50000, 100000, 200000]`,
 * `--out path` a path to a folder where the output is stored, `default=./out`,
 * `--min_depth int` a minimum read depth per SNP to be included `default=1`,
-* `--cutoff int` maximum distance from a read to a closest so that the read is still matched to the SNP `default=1000`,
+* `--cutoff int` maximum distance from a read to a closest so that the read is still matched to the SNP `default=0`,
 
 ## Contact
 Email questions, feature requests and bug reports to **Adam Streck, adam.streck@mdc-berlin.de**.

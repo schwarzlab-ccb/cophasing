@@ -1,11 +1,12 @@
 nextflow.enable.dsl=2
 
 // IMPROVEMENT: consider monoallelic if ratio more than 10:1 (less strict)
+
 // Default parameter values
-params.bins = [50000, 100000, 200000]
-params.out = "out"
-params.debug_out = ""
-params.cutoff = 1000 // Maximum distance between a read and a variant to be considered for analysis
+params.bins = [50000, 100000, 200000] // Bin sizes to use for analysis, each bin size will be analyzed separately
+params.out = "out" // Output directory containing the results
+params.debug_out = "" // If set, will output intermediate files to this directory
+params.cutoff = 0 // Maximum distance between a read and a variant to be considered for analysis
 params.min_depth = 1 // Minimum required read depth per variant to be considered for analysis
 
 process filterUnphased 
@@ -240,5 +241,6 @@ workflow
     window_sample_pairs = genome_bins.combine(sample_beds.mix(hap_beds))
     coverages = calcCoverage(window_sample_pairs)
     covs_by_bin = genome_bins.join(coverages.groupTuple())
-    cov_tables = createCoverageTables(ref_fa.baseName, covs_by_bin)
+    output_name = params.name != "" ? params.name : ref_fa.baseName
+    cov_tables = createCoverageTables(output_name, covs_by_bin)
 }
