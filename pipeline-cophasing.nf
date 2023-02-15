@@ -1,19 +1,21 @@
 nextflow.enable.dsl=2
 
 // IMPROVEMENT: consider monoallelic if ratio more than 10:1 (less strict)
+
 // Default parameter values
-params.bins = [50000, 100000, 200000]
-params.out = "out"
-params.debug_out = ""
-params.cutoff = 1000 // Maximum distance between a read and a variant to be considered for analysis
+params.bins = [50000, 100000, 200000] // Bin sizes to use for analysis, each bin size will be analyzed separately
+params.out = "out" // Output directory containing the results
+params.debug_out = "" // If set, will output intermediate files to this directory
+params.cutoff = 0 // Maximum distance between a read and a variant to be considered for analysis
 params.min_depth = 1 // Minimum required read depth per variant to be considered for analysis
+params.name = "" // Will default to the name of the FA file if not set
 
 process filterUnphased 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
-    tuple path(vcf) 
+    path(vcf) 
 
     output:
     tuple path("${vcf.simpleName}.filtered.vcf.gz"), path("${vcf.simpleName}.filtered.vcf.gz.tbi") 
@@ -28,7 +30,7 @@ process filterUnphased
 
 process convertBamToBed 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(bam) 
@@ -44,7 +46,7 @@ process convertBamToBed
 
 process convertVcfToBed 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(vcf) 
@@ -66,7 +68,7 @@ process convertVcfToBed
 
 process bcftoolsPileup 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     path(ref_genome)
@@ -87,7 +89,7 @@ process bcftoolsPileup
 
 // Keep only sites where are reads are allocated to one allele
 process filterSites {    
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(vcf)
@@ -106,7 +108,7 @@ process filterSites {
 
 process findClosesBed 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(bam_bed), path(vcf_bed) 
@@ -116,14 +118,14 @@ process findClosesBed
     
     script:
     """
-    bedtools closest -d -t all -k 1 -a $bam_bed -b $vcf_bed | awk '\$NF < $params.cutoff' > ${name}.closest.bed
+    bedtools closest -d -t all -k 1 -a $bam_bed -b $vcf_bed | awk '\$NF <= $params.cutoff' > ${name}.closest.bed
     """
 }
 
 // TODO: This should be improved - currently the original reads are filtered by info in the closest.bed, but the file itself could be used
 process splitBamFilesToHaps 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     tuple val(name), path(bam), path(closest_bed), val(hap)
@@ -139,7 +141,7 @@ process splitBamFilesToHaps
 
 process getGenomeSizes 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     path(ref_genome)
@@ -156,7 +158,7 @@ process getGenomeSizes
 
 process binGenome 
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     path(genome_sizes)
@@ -173,13 +175,13 @@ process binGenome
 
 process calcCoverage
 {
-    publishDir "${params.debug_out}", mode: "copy", enabled: params.debug_out != ""
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
     
     input:
     tuple val(bin), path(bin_bed), val(name), path(read_bed)
     
     output:
-    tuple val(bin), val(name), path("${name}.${bin}.cov")
+    tuple val("${bin}.${name[-4..-1]}"), val(name), path("${name}.${bin}.cov")
     
     script:
     """
@@ -204,13 +206,13 @@ process createCoverageTables
     names.sort()
     cov_files = "$covs".split(" ");
     cov_files.sort()
-    header = "chrom\tstart\tstop\t" + names.join("\t")
+    header = "chrom\tstart\tstop\t" + names.collect{it[0..-6]}.join("\t") // remove the haplotype from the sample name
+    table_file = "${genome_name}.${bin}.table"
     """
-    echo -e \"$header\" > ${genome_name}.${bin}.table
-    paste $genome_bin ${cov_files.join(" ")} >> ${genome_name}.${bin}.table
+    echo -e \"$header\" > ${table_file}
+    paste $genome_bin ${cov_files.join(" ")} >> ${table_file}
     """
 }
-
 
 workflow 
 {
@@ -234,11 +236,15 @@ workflow
     // Split reads into haplotypes 
     sample_beds = convertBamToBed(bam)
     closest_beds = findClosesBed(sample_beds.join(vcf_beds))
+    named_beds = sample_beds.map { it -> [it[0] + "_both", it[1]]}
     hap_beds = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
+    all_beds = named_beds.mix(hap_beds)
 
     // Calculate coverage for each sample and bin
-    window_sample_pairs = genome_bins.combine(sample_beds.mix(hap_beds))
+    window_sample_pairs = genome_bins.combine(all_beds)
     coverages = calcCoverage(window_sample_pairs)
-    covs_by_bin = genome_bins.join(coverages.groupTuple())
-    cov_tables = createCoverageTables(ref_fa.baseName, covs_by_bin)
+    tables = genome_bins.combine(Channel.from(["both", "hap1", "hap2"])).map { it -> [it[0] + "." + it[2], it[1]] }
+    covs_by_bin = tables.join(coverages.groupTuple())
+    output_name = params.name != "" ? params.name : ref_fa.baseName
+    cov_tables = createCoverageTables(output_name, covs_by_bin)
 }

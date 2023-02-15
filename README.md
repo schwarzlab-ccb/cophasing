@@ -10,13 +10,11 @@ Nextflow-based pipeline for cophasing of GAM reads.
 3. **Phased** SNPs the in VCF format.
 
 ### Output
-A set of tables of the form `{genome_name}.{bin_size}.table` for different bin sizes with the number of reads per bin. The columns are:
+A set of tables of the form `{genome_name}.{bin_size}.{hap}.table` for different bin sizes with the number of reads per bin per `sample`. Haplotype `hap` is either `hap1`, `hap2`, or `both`.  The columns are:
 1. `chrom`: chromosome name
 2. `start`: start position of the bin
 3. `stop`: the stop position of the bin
-4. `{sample}`: the number of reads in the bin
-5. `{sample_hap1}`: the number but for the first haplotype
-6. `{sample_hap2}`: the number but for the second haplotype
+4. `[sample]`: the number of reads in the bing for each sample
 
 ### Process
 
@@ -68,10 +66,11 @@ Random testing data are provided as a part of the package. Run the following com
 **Note**: GATK requires `.gz` files to be compressed with `bgzip`, not `gzip`.
 
 #### Default 
+* `--name string` the prefix that will be given to the samples, `default=<the name of the reference file>`,
 * `--bins [int]` the bin sizes to be used, `default=[50000, 100000, 200000]`,
 * `--out path` a path to a folder where the output is stored, `default=./out`,
 * `--min_depth int` a minimum read depth per SNP to be included `default=1`,
-* `--cutoff int` maximum distance from a read to a closest so that the read is still matched to the SNP `default=1000`,
+* `--cutoff int` maximum distance from a read to a closest so that the read is still matched to the SNP `default=0`,
 
 ## Contact
 Email questions, feature requests and bug reports to **Adam Streck, adam.streck@mdc-berlin.de**.
