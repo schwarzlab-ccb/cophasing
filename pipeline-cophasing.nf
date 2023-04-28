@@ -99,7 +99,7 @@ process filterSites {
     
     script:
     filter_mono = "(FORMAT/AD[0:0] > 0 && FORMAT/AD[0:1] == 0) || (FORMAT/AD[0:0] == 0 && FORMAT/AD[0:2] == 0)"
-    filter_depth = "(FORMAT/DP[0:0] > $params.min_depth)"
+    filter_depth = "(FORMAT/DP[0:0] >= $params.min_depth)"
     """
     bcftools filter -i "$filter_mono && $filter_depth" $vcf > ${name}.mono
     """
