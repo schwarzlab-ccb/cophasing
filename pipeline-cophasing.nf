@@ -55,14 +55,20 @@ process convertVcfToBed
     tuple val(name), path("${name}.vcf.bed")
 
     script:
-    obs_ref = ":[[:digit:]]+,0" // OBSERVED REFERENCE
-    obs_alt = ":0,[[:digit:]]+,0" // OBSERVED ALTERNATIVE
+    obs_ref = ":[[:digit:]]+,0\$" // OBSERVED REFERENCE
+    obs_ref_err = ":[[:digit:]]+,[[:digit:]],0\$" // OBSERVED AND A POSSIBLE SEQ_ERROR REFERENCE
+    obs_alt = ":0,[[:digit:]]+,0\$" // OBSERVED ALTERNATIVE
+    obs_two_alt = ":0,[[:digit:]]+,[[:digit:]],0\$" // OBSERVED ALTERNATIVE AND A POSSIBLE SEQ_ERROR
     """
     cat $vcf | vcf2bed | cut -f1-3,11 | sort -k1,1 -k2,2nn > ${name}.vcf.bed    
-    sed -E -i "s/0\\|1.*${obs_ref}/hap1/g" ${name}.vcf.bed 
     sed -E -i "s/1\\|0.*${obs_alt}/hap1/g" ${name}.vcf.bed 
     sed -E -i "s/0\\|1.*${obs_alt}/hap2/g" ${name}.vcf.bed 
+    sed -E -i "s/1\\|0.*${obs_two_alt}/hap1/g" ${name}.vcf.bed 
+    sed -E -i "s/0\\|1.*${obs_two_alt}/hap2/g" ${name}.vcf.bed 
+    sed -E -i "s/0\\|1.*${obs_ref}/hap1/g" ${name}.vcf.bed 
     sed -E -i "s/1\\|0.*${obs_ref}/hap2/g" ${name}.vcf.bed 
+    sed -E -i "s/0\\|1.*${obs_ref_err}/hap1/g" ${name}.vcf.bed 
+    sed -E -i "s/1\\|0.*${obs_ref_err}/hap2/g" ${name}.vcf.bed 
     """
 }
 
@@ -97,8 +103,9 @@ process filterSites {
     output:
     tuple val(name), path("${name}.mono")
     
+    // Retain if either monoallelic, or biallelic with no more than one read on the second allele and more than one on first allele
     script:
-    filter_mono = "(FORMAT/AD[0:0] > 0 && FORMAT/AD[0:1] == 0) || (FORMAT/AD[0:0] == 0 && FORMAT/AD[0:2] == 0)"
+    filter_mono = "(FORMAT/AD[0:0] > 1 && FORMAT/AD[0:1] < 2 && FORMAT/AD[0:2] == 0) || (FORMAT/AD[0:0] > 0 && FORMAT/AD[0:1] == 0) || (FORMAT/AD[0:0] == 0 && FORMAT/AD[0:2] < 2)"
     filter_depth = "(FORMAT/DP[0:0] >= $params.min_depth)"
     """
     bcftools filter -i "$filter_mono && $filter_depth" $vcf > ${name}.mono
