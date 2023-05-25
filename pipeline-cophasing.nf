@@ -55,20 +55,14 @@ process convertVcfToBed
     tuple val(name), path("${name}.vcf.bed")
 
     script:
-    obs_ref = ":[[:digit:]]+,0\$" // OBSERVED REFERENCE
-    obs_ref_err = ":[[:digit:]]+,[[:digit:]],0\$" // OBSERVED AND A POSSIBLE SEQ_ERROR REFERENCE
-    obs_alt = ":0,[[:digit:]]+,0\$" // OBSERVED ALTERNATIVE
-    obs_two_alt = ":0,[[:digit:]]+,[[:digit:]],0\$" // OBSERVED ALTERNATIVE AND A POSSIBLE SEQ_ERROR
+    obs_ref = ":(([[:digit:]]+,0\$)|([[:digit:]]+,[[:digit:]],0))\$" // OBSERVED REFERENCE
+    obs_alt = ":((0,[[:digit:]]+,0\$)|(0,[[:digit:]]+,[[:digit:]],0))\$" // OBSERVED ALTERNATIVE
     """
     cat $vcf | vcf2bed | cut -f1-3,11 | sort -k1,1 -k2,2nn > ${name}.vcf.bed    
     sed -E -i "s/1\\|0.*${obs_alt}/hap1/g" ${name}.vcf.bed 
     sed -E -i "s/0\\|1.*${obs_alt}/hap2/g" ${name}.vcf.bed 
-    sed -E -i "s/1\\|0.*${obs_two_alt}/hap1/g" ${name}.vcf.bed 
-    sed -E -i "s/0\\|1.*${obs_two_alt}/hap2/g" ${name}.vcf.bed 
     sed -E -i "s/0\\|1.*${obs_ref}/hap1/g" ${name}.vcf.bed 
     sed -E -i "s/1\\|0.*${obs_ref}/hap2/g" ${name}.vcf.bed 
-    sed -E -i "s/0\\|1.*${obs_ref_err}/hap1/g" ${name}.vcf.bed 
-    sed -E -i "s/1\\|0.*${obs_ref_err}/hap2/g" ${name}.vcf.bed 
     """
 }
 
