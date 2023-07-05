@@ -248,4 +248,17 @@ workflow
     covs_by_bin = tables.join(coverages.groupTuple())
     output_name = params.name != "" ? params.name : ref_fa.baseName
     cov_tables = createCoverageTables(output_name, covs_by_bin)
+
+	// Create the segregation table
+	cov_tables.map { file -> 
+        def matcher = file.baseName =~ /(.*)\.(hap1|hap2|both)/
+        if (matcher.matches()) {
+            def size = matcher[0][1]
+            def type = matcher[0][2]
+            return tuple(size, type, file)
+        } else {
+            println("File ${file} did not match pattern")
+            return null
+        }
+    }
 }
