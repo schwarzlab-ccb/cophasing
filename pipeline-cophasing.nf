@@ -200,7 +200,7 @@ process createCoverageTables
     tuple val(bin), path(genome_bin), val(names), path(covs)
     
     output:
-    path("${genome_name}.${bin}.table")
+    path("${genome_name}.${bin}.coverage.tsv")
     
     script:
     // Names of samples and files are lexicographically sorted first
@@ -208,7 +208,7 @@ process createCoverageTables
     cov_files = "$covs".split(" ");
     cov_files.sort()
     header = "chrom\tstart\tstop\t" + names.collect{it[0..-6]}.join("\t") // remove the haplotype from the sample name
-    table_file = "${genome_name}.${bin}.table"
+    table_file = "${genome_name}.${bin}.coverage.tsv"
     """
     echo -e \"$header\" > ${table_file}
     paste $genome_bin ${cov_files.join(" ")} >> ${table_file}
@@ -217,8 +217,9 @@ process createCoverageTables
 
 def groupFilesBySizeAndType(cov_tables) 
 {
-	return cov_tables.map { file -> 
-        def matcher = file.baseName =~ /(.*)\.(hap1|hap2|both)/
+	return cov_tables.map 
+    { file -> 
+        def matcher = file.name =~ /(.*)\.(hap1|hap2|both)\.coverage\.tsv/
         if (matcher.matches()) {
             def size = matcher[0][1]
             def type = matcher[0][2]
@@ -228,20 +229,33 @@ def groupFilesBySizeAndType(cov_tables)
             return null
         }
     }
-	.filter { it != null }
-	.groupTuple(sort: true)
-	.map { size, type, files -> 
-		def indices = ['hap1', 'hap2', 'both'].collect { type.indexOf(it) }
-		if (indices.any { it == -1 }) {
-			println("Missing types for size ${size}")
-			return null
-		}
-		def hap1File = files[indices[0]]
-		def hap2File = files[indices[1]]
-		def bothFile = files[indices[2]]
-		return tuple(size, hap1File, hap2File, bothFile)
-	}
-	.filter { it != null }
+    .filter { it != null }
+    .groupTuple()
+    .map 
+    { size, types, files ->
+        def fileMap = ['hap1': null, 'hap2': null, 'both': null]
+        types.eachWithIndex { type, i -> 
+            fileMap[type] = files[i]
+        }
+        return tuple(size, fileMap['hap1'], fileMap['hap2'], fileMap['both'])
+    }
+    .filter { it[1] != null && it[2] != null && it[3] != null }
+}
+
+process createSegregationTables
+{
+    publishDir params.out, mode: "copy"
+
+    input:
+    tuple val(group_name), path(hap1_cov), path(hap2_cov), path(both_cov)
+
+    output:
+    path("${group_name}.*.tsv")
+
+    script:
+    """
+    python $projectDir/scripts/get_segregation_tables.py $group_name $hap1_cov $hap2_cov $both_cov
+    """
 }
 
 workflow 
@@ -279,6 +293,7 @@ workflow
     cov_tables = createCoverageTables(output_name, covs_by_bin)
 
 	// Create the segregation table
-	grouped_tables = groupFilesBySizeAndType(cov_tables)
-	grouped_tables.view()
+	grouped_tables = groupFilesBySizeAndType(cov_tables)    
+    segregation_tables = createSegregationTables(grouped_tables)
 }
+

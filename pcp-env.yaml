@@ -14,3 +14,7 @@ dependencies:
   - samtools
   - vcftools
   - bedops
+  - python >=3.6
+  - pip
+  - pandas
+  - numpy
