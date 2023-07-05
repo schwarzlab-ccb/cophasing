@@ -215,6 +215,35 @@ process createCoverageTables
     """
 }
 
+def groupFilesBySizeAndType(cov_tables) 
+{
+	return cov_tables.map { file -> 
+        def matcher = file.baseName =~ /(.*)\.(hap1|hap2|both)/
+        if (matcher.matches()) {
+            def size = matcher[0][1]
+            def type = matcher[0][2]
+            return tuple(size, type, file)
+        } else {
+            println("File ${file} did not match pattern")
+            return null
+        }
+    }
+	.filter { it != null }
+	.groupTuple(sort: true)
+	.map { size, type, files -> 
+		def indices = ['hap1', 'hap2', 'both'].collect { type.indexOf(it) }
+		if (indices.any { it == -1 }) {
+			println("Missing types for size ${size}")
+			return null
+		}
+		def hap1File = files[indices[0]]
+		def hap2File = files[indices[1]]
+		def bothFile = files[indices[2]]
+		return tuple(size, hap1File, hap2File, bothFile)
+	}
+	.filter { it != null }
+}
+
 workflow 
 {
     // Inputs
@@ -250,15 +279,6 @@ workflow
     cov_tables = createCoverageTables(output_name, covs_by_bin)
 
 	// Create the segregation table
-	cov_tables.map { file -> 
-        def matcher = file.baseName =~ /(.*)\.(hap1|hap2|both)/
-        if (matcher.matches()) {
-            def size = matcher[0][1]
-            def type = matcher[0][2]
-            return tuple(size, type, file)
-        } else {
-            println("File ${file} did not match pattern")
-            return null
-        }
-    }
+	grouped_tables = groupFilesBySizeAndType(cov_tables)
+	grouped_tables.view()
 }
