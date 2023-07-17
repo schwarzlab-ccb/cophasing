@@ -10,6 +10,21 @@ params.cutoff = 0 // Maximum distance between a read and a variant to be conside
 params.min_depth = 1 // Minimum required read depth per variant to be considered for analysis
 params.name = "" // Will default to the name of the FA file if not set
 
+
+process bgzip 
+{    
+    input:
+    path(fa)
+
+    output:
+    path("*.gz")
+    
+    """
+    bgzip $fa 
+    """  
+}
+
+
 process filterUnphased 
 {
     publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
@@ -263,18 +278,20 @@ workflow
     // Inputs
     bam = Channel.fromFilePairs(params.bam, size: 1)
     ref_fa = file(params.fa)
+    fa_is_zipped = params.fa.endsWith(".gz")
+    fasta = fa_is_zipped ? ref_fa : bgzip(ref_fa)
     vcf = file(params.vcf)
     bin_sizes = Channel.from(params.bins)    
 
     // Create and filter pileup to obtain phased variant sites observed in the reads
     filtered_vcf = filterUnphased(vcf)
     combined = bam.combine(filtered_vcf)    
-    pileup = bcftoolsPileup(ref_fa, combined)
+    pileup = bcftoolsPileup(fasta, combined)
     filtered_pileup = filterSites(pileup)
     vcf_beds = convertVcfToBed(filtered_pileup)
 
     // Calculate bins
-    genome_size = getGenomeSizes(ref_fa)
+    genome_size = getGenomeSizes(fasta)
     genome_bins = binGenome(genome_size, bin_sizes)
 
     // Split reads into haplotypes 
@@ -283,6 +300,7 @@ workflow
     named_beds = sample_beds.map { it -> [it[0] + "_both", it[1]]}
     hap_beds = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
     all_beds = named_beds.mix(hap_beds)
+    
 
     // Calculate coverage for each sample and bin
     window_sample_pairs = genome_bins.combine(all_beds)
