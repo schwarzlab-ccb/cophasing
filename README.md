@@ -85,7 +85,8 @@ Random testing data are provided as a part of the package. Run the following com
 A sample visualization method is shown in the notebook `NMPI_matrix_vis.ipynb`. This notebook loads a singular segregation table and plots a contact map for one chromosome in a specified region. 
 
 ## Authors
-This pipeline has been developed at Max DelbrÃ¼ck Center for Molecular Medicine, Berlin. Authors:
+This pipeline has been developed at Max Delbrück Center for Molecular Medicine, Berlin. Authors:
+
 * Dr. Adam Streck: pipeline development,
 * Dr. Julia Markowski: creator of the co-phasing method,
 * Dr. Alexander Kukalev: creator of the separation algorithm.
