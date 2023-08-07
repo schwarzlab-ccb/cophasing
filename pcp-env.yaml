@@ -8,12 +8,12 @@ dependencies:
   - curl
   - bcftools
   - bedtools
-  - gatk4
-  - openjdk>=10.0
-  - nextflow
   - samtools
   - vcftools
   - bedops
+  - gatk4
+  - openjdk >=10.0
+  - nextflow
   - python >=3.6
   - pip
   - pandas

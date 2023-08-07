@@ -8,6 +8,7 @@ params.out = "out" // Output directory containing the results
 params.debug_out = "" // If set, will output intermediate files to this directory
 params.cutoff = 0 // Maximum distance between a read and a variant to be considered for analysis
 params.min_depth = 1 // Minimum required read depth per variant to be considered for analysis
+params.max_pval = 0.05 // Maximum base reads not assigned to the primary observed allele
 params.name = "" // Will default to the name of the FA file if not set
 
 
@@ -59,7 +60,7 @@ process convertBamToBed
     """
 }
 
-// Should be done using bfctools query
+
 process convertVcfToBed 
 {
     publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
@@ -71,14 +72,14 @@ process convertVcfToBed
     tuple val(name), path("${name}.vcf.bed")
 
     script:
-    obs_ref = ":(([[:digit:]]+,0\$)|([[:digit:]]+,[01],0\$)|([[:digit:]]+,[01],[01],[01]\$))" // OBSERVED REFERENCE e.g. "16,0", "16,1,0", "16,1,1,0"
-    obs_alt = ":(([01],[[:digit:]]+,0\$)|([01],[[:digit:]]+,[01],[01]\$))" // OBSERVED ALTERNATIVE e.g. "1,16,0", "0,16,1,1"
+    obs_ref = "FORMAT/AD[0:0]>=FORMAT/AD[0:1]" // OBSERVED REFERENCE, note that equal should not ever happen, even though its permitted here
+    obs_alt = "FORMAT/AD[0:0]<FORMAT/AD[0:1]" // OBSERVED ALTERNATIVE
+    // Below we print out the position twice, awk is used to increment the second position by 1 (end)
     """
-    cat $vcf | vcf2bed | cut -f1-3,11 | sort -k1,1 -k2,2nn > ${name}.vcf.bed    
-    sed -E -i "s/1\\|0.*${obs_alt}/hap1/g" ${name}.vcf.bed 
-    sed -E -i "s/0\\|1.*${obs_alt}/hap2/g" ${name}.vcf.bed 
-    sed -E -i "s/0\\|1.*${obs_ref}/hap1/g" ${name}.vcf.bed 
-    sed -E -i "s/1\\|0.*${obs_ref}/hap2/g" ${name}.vcf.bed 
+    touch ${name}.vcf.bed    
+    bcftools query $vcf -i '(GT="1|0" && $obs_ref) || (GT="0|1" && $obs_alt) ' -f '%CHROM %POS %POS hap1\n' | awk '{ \$3 = \$3 + 1 } 1' >> ${name}.vcf.bed   
+    bcftools query $vcf -i '(GT="1|0" && $obs_alt) || (GT="0|1" && $obs_ref) ' -f '%CHROM %POS %POS hap2\n' | awk '{ \$3 = \$3 + 1 } 1' >> ${name}.vcf.bed      
+    sort ${name}.vcf.bed -k1,1 -k2,2nn -o ${name}.vcf.bed
     """
 }
 
@@ -95,7 +96,7 @@ process bcftoolsPileup
 
     script:
     """
-    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/DP,FORMAT/AD -O v $bam | vcf-sort | bgzip > ${name}.temp.vcf.gz 
+    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/DP,FORMAT/AD -O v $bam | bcftools sort | bgzip > ${name}.temp.vcf.gz 
     tabix ${name}.temp.vcf.gz
     echo `bcftools query -l $vcf` `bcftools query -l ${name}.temp.vcf.gz` > samples.txt
     if [ `wc -l < samples.txt` != 1 ]; then echo "there must be exactly one sample in the VCF ${vcf}"; exit 1; fi;
@@ -115,7 +116,7 @@ process filterSites {
     
     // Retain if either monoallelic, or with a maximum noise as specified
     script:
-    filter_mono = "FORMAT/DP[0:0] - MAX(FORMAT/AD) <= 1"
+    filter_mono = "binom(FMT/AD) < $params.max_pval"
     filter_depth = "FORMAT/DP[0:0] >= $params.min_depth"
     """
     bcftools filter -i "($filter_mono) && ($filter_depth)" $vcf > ${name}.mono
