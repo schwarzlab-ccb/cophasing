@@ -83,30 +83,48 @@ process convertVcfToBed
     """
 }
 
-// The sample name is not the same between the Pileup and the reference, needs to be matched, hence the samples file
 process bcftoolsPileup 
 {
     publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
 
     input:
     path(ref_genome)
-    tuple val(name), path(bam), path(vcf), path(tb)
+    tuple path(vcf), path(tb)
+    tuple val(name), path(bam)
     
     output:
     tuple val(name), path("${name}.pileup.vcf")
 
     script:
     """
-    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/DP,FORMAT/AD -O v $bam | bcftools sort > ${name}.piled.vcf
-    awk -F'\t' 'BEGIN {OFS="\t"} {split(\$5, a, ","); \$5 = a[1]; print \$0}' ${name}.piled.vcf > ${name}.cut.vcf
+    bcftools mpileup -f $ref_genome -T $vcf -a FORMAT/DP,FORMAT/AD -O v $bam | bcftools sort > ${name}.pileup.vcf
+    """
+}
+
+// If ALT is not known in pileup, take it from VCF. Annotate only where ALT matches between pileup and VCF
+process bcftoolsAnnotate
+{
+    publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
+
+    input:
+    tuple path(vcf), path(tb)
+    tuple val(name), path(pileup)
+    
+    output:
+    tuple val(name), path("${name}.annotated.vcf")
+
+    script:
+    // The sample name is not the same between the Pileup and the reference, needs to be matched, hence the samples.txt file
+    """
+    echo `bcftools query -l $vcf` `bcftools query -l $pileup` > samples.txt
+    if [ `wc -l < samples.txt` != 1 ]; then echo "there must be exactly one sample in the VCF $vcf"; exit 1; fi;
+    awk -F'\t' 'BEGIN {OFS="\t"} {split(\$5, a, ","); \$5 = a[1]; print \$0}' $pileup > ${name}.cut.vcf
     bgzip ${name}.cut.vcf
     tabix ${name}.cut.vcf.gz
-    echo `bcftools query -l $vcf` `bcftools query -l ${name}.cut.vcf.gz` > samples.txt
-    if [ `wc -l < samples.txt` != 1 ]; then echo "there must be exactly one sample in the VCF ${vcf}"; exit 1; fi;
     bcftools annotate -a $vcf -c ALT ${name}.cut.vcf.gz -i "FORMAT/AD[0:1]<=0" -k -S samples.txt > ${name}.fill.vcf
     bgzip ${name}.fill.vcf
     tabix ${name}.fill.vcf.gz    
-    bcftools annotate -a $vcf -c FORMAT/GT ${name}.fill.vcf.gz -S samples.txt > ${name}.pileup.vcf
+    bcftools annotate -a $vcf -c FORMAT/GT ${name}.fill.vcf.gz -S samples.txt > ${name}.annotated.vcf
     """
 }
 
@@ -283,19 +301,27 @@ process createSegregationTables
 
 workflow 
 {
+    // Asserts
+    if (params.debug_out != "") {
+        def outputFolder = file(params.debug_out)
+        if (!outputFolder.exists()) {
+            outputFolder.mkdirs()
+        }
+    }
+
     // Inputs
     bam = Channel.fromFilePairs(params.bam, size: 1)
     ref_fa = file(params.fa)
     fa_is_zipped = params.fa.endsWith(".gz")
     fasta = fa_is_zipped ? ref_fa : bgzip(ref_fa)
-    vcf = Channel.fromPath(params.vcf)
+    vcf = file(params.vcf)
     bin_sizes = Channel.from(params.bins)    
 
     // Create and filter pileup to obtain phased variant sites observed in the reads
     filtered_vcf = filterUnphased(vcf)
-    combined = bam.combine(filtered_vcf)    
-    pileup = bcftoolsPileup(fasta, combined)
-    filtered_pileup = filterSites(pileup)
+    pileup = bcftoolsPileup(fasta, filtered_vcf, bam)
+    annotated_pileup = bcftoolsAnnotate(filtered_vcf, pileup)
+    filtered_pileup = filterSites(annotated_pileup)
     vcf_beds = convertVcfToBed(filtered_pileup)
 
     // Calculate bins

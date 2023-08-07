@@ -66,9 +66,9 @@ Random testing data are provided as a part of the package. Run the following com
 ### Parameters
 
 #### Mandatory
-* `--fa path` reference file either as `.fa`  or `.fa.gz`.
 * `--bam path` alignment files either as `.bam` or `.sam`. This can be a glob pattern (e.g. `sample*.bam`). All files matching the pattern are used then.
-*  `--vcf path` variant call files either as `.vcf` or `.vcf.gz`. Must contain phased GT information.
+* `--fa path` reference file either as `.fa`  or `.fa.gz`.
+* `--vcf path` a variant call file either as `.vcf` or `.vcf.gz`. Must contain phased GT information.
 
 **Note**: GATK requires `.gz` files to be compressed with `bgzip`, not `gzip`.
 
