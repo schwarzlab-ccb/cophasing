@@ -59,6 +59,7 @@ process convertBamToBed
     """
 }
 
+// Should be done using bfctools query
 process convertVcfToBed 
 {
     publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
@@ -70,8 +71,8 @@ process convertVcfToBed
     tuple val(name), path("${name}.vcf.bed")
 
     script:
-    obs_ref = ":(([[:digit:]]+,0\$)|([[:digit:]]+,[[:digit:]],0))\$" // OBSERVED REFERENCE
-    obs_alt = ":((0,[[:digit:]]+,0\$)|(0,[[:digit:]]+,[[:digit:]],0))\$" // OBSERVED ALTERNATIVE
+    obs_ref = ":(([[:digit:]]+,0\$)|([[:digit:]]+,[01],0\$)|([[:digit:]]+,[01],[01],[01]\$))" // OBSERVED REFERENCE e.g. "16,0", "16,1,0", "16,1,1,0"
+    obs_alt = ":(([01],[[:digit:]]+,0\$)|([01],[[:digit:]]+,[01],[01]\$))" // OBSERVED ALTERNATIVE e.g. "1,16,0", "0,16,1,1"
     """
     cat $vcf | vcf2bed | cut -f1-3,11 | sort -k1,1 -k2,2nn > ${name}.vcf.bed    
     sed -E -i "s/1\\|0.*${obs_alt}/hap1/g" ${name}.vcf.bed 
@@ -112,12 +113,12 @@ process filterSites {
     output:
     tuple val(name), path("${name}.mono")
     
-    // Retain if either monoallelic, or biallelic with no more than one read on the second allele and more than one on first allele
+    // Retain if either monoallelic, or with a maximum noise as specified
     script:
-    filter_mono = "(FORMAT/AD[0:0] > 1 && FORMAT/AD[0:1] < 2 && FORMAT/AD[0:2] == 0) || (FORMAT/AD[0:0] > 0 && FORMAT/AD[0:1] == 0) || (FORMAT/AD[0:0] == 0 && FORMAT/AD[0:2] < 2)"
-    filter_depth = "(FORMAT/DP[0:0] >= $params.min_depth)"
+    filter_mono = "FORMAT/DP[0:0] - MAX(FORMAT/AD) <= 1"
+    filter_depth = "FORMAT/DP[0:0] >= $params.min_depth"
     """
-    bcftools filter -i "$filter_mono && $filter_depth" $vcf > ${name}.mono
+    bcftools filter -i "($filter_mono) && ($filter_depth)" $vcf > ${name}.mono
     """
 }
 
