@@ -77,8 +77,8 @@ process convertVcfToBed
     // Below we print out the position twice, awk is used to increment the second position by 1 (end)
     """
     touch ${name}.vcf.bed    
-    bcftools query $vcf -i '(GT="1|0" && $obs_ref) || (GT="0|1" && $obs_alt) ' -f '%CHROM %POS %POS hap1\n' | awk '{ \$3 = \$3 + 1 } 1' >> ${name}.vcf.bed   
-    bcftools query $vcf -i '(GT="1|0" && $obs_alt) || (GT="0|1" && $obs_ref) ' -f '%CHROM %POS %POS hap2\n' | awk '{ \$3 = \$3 + 1 } 1' >> ${name}.vcf.bed      
+    bcftools query $vcf -i '(GT="1|0" && $obs_ref) || (GT="0|1" && $obs_alt) ' -f '%CHROM %POS %POS hap1\n' | awk '{ \$3 = \$3 + 1 } 1' | sed 's/ /\t/g' >> ${name}.vcf.bed   
+    bcftools query $vcf -i '(GT="1|0" && $obs_alt) || (GT="0|1" && $obs_ref) ' -f '%CHROM %POS %POS hap2\n' | awk '{ \$3 = \$3 + 1 } 1' | sed 's/ /\t/g' >> ${name}.vcf.bed      
     sort ${name}.vcf.bed -k1,1 -k2,2nn -o ${name}.vcf.bed
     """
 }
@@ -335,7 +335,6 @@ workflow
     hap_beds = splitBamFilesToHaps(bam.join(closest_beds).combine(Channel.from("hap1", "hap2")))
     all_beds = named_beds.mix(hap_beds)
     
-
     // Calculate coverage for each sample and bin
     window_sample_pairs = genome_bins.combine(all_beds)
     coverages = calcCoverage(window_sample_pairs)
