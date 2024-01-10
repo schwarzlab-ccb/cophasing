@@ -1,14 +1,12 @@
 nextflow.enable.dsl=2
 
-// IMPROVEMENT: consider monoallelic if ratio more than 10:1 (less strict)
-
 // Default parameter values
 params.bins = [50000, 100000, 200000] // Bin sizes to use for analysis, each bin size will be analyzed separately
 params.out = "out" // Output directory containing the results
 params.debug_out = "" // If set, will output intermediate files to this directory
 params.cutoff = 0 // Maximum distance between a read and a variant to be considered for analysis
 params.min_depth = 1 // Minimum required read depth per variant to be considered for analysis
-params.max_pval = 0.01 // Maximum base reads not assigned to the primary observed allele
+params.min_ratio = 5 // Main base must be at least {min_ratio} times more often represented than the remaining bases (or the only one represented)
 params.name = "" // Will default to the name of the FA file if not set
 
 
@@ -138,12 +136,55 @@ process filterSites {
     output:
     tuple val(name), path("${name}.mono")
     
-    // Retain if either monoallelic, or with a maximum noise as specified
+    // Filter only if the read depth is above the minimum and the most represented base occurs at least params.max_ratio more often than the rest of the bases
     script:
-    filter_mono = "binom(FMT/AD) < $params.max_pval"
-    filter_depth = "FORMAT/DP[0:0] >= $params.min_depth"
+    filter_four = """
+        (FORMAT/AD[0:3] >= 0) 
+        && 
+        (
+            (
+                (FORMAT/AD[0:0] > FORMAT/AD[0:1]) 
+                && 
+                (FORMAT/AD[0:0] < (FORMAT/AD[0:1] + FORMAT/AD[0:2] + FORMAT/AD[0:3]) * ${params.min_ratio})
+            ) 
+            || 
+            (
+                (FORMAT/AD[0:0] <= FORMAT/AD[0:1])
+                && 
+                (FORMAT/AD[0:1] < (FORMAT/AD[0:0] + FORMAT/AD[0:2] + FORMAT/AD[0:3]) * ${params.min_ratio})
+            )
+        )"""
+    filter_three = """  
+        (FORMAT/AD[0:2] >= 0) 
+        && 
+        (
+            (
+                (FORMAT/AD[0:0] > FORMAT/AD[0:1]) 
+                && 
+                (FORMAT/AD[0:0] < (FORMAT/AD[0:1] + FORMAT/AD[0:2]) * ${params.min_ratio})
+            ) 
+            || 
+            (
+                (FORMAT/AD[0:0] <= FORMAT/AD[0:1])
+                && 
+                (FORMAT/AD[0:1] < (FORMAT/AD[0:0] + FORMAT/AD[0:2]) * ${params.min_ratio})
+            )
+        )"""
+    filter_two = """
+        (
+            (FORMAT/AD[0:0] > FORMAT/AD[0:1]) 
+            && 
+            (FORMAT/AD[0:0] < FORMAT/AD[0:1] * ${params.min_ratio})
+        )
+        ||
+        (
+            (FORMAT/AD[0:0] <= FORMAT/AD[0:1]) 
+            && 
+            (FORMAT/AD[0:1] < FORMAT/AD[0:0] * ${params.min_ratio})
+        )"""
+    filter_depth = "FORMAT/DP[0:0] < $params.min_depth"
     """
-    bcftools filter -i "($filter_mono) && ($filter_depth)" $vcf > ${name}.mono
+    bcftools filter -e "($filter_depth) || ($filter_two) || ($filter_three) || ($filter_four)" $vcf > ${name}.mono
     """
 }
 
