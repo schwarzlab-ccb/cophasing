@@ -7,7 +7,7 @@ params.debug_out = "" // If set, will output intermediate files to this director
 params.cutoff = 0 // Maximum distance between a read and a variant to be considered for analysis
 params.min_depth = 1 // Minimum required read depth per variant to be considered for analysis
 params.min_ratio = 5 // Main base must be at least {min_ratio} times more often represented than the remaining bases (or the only one represented)
-params.name = "" // Will default to the name of the FA file if not set
+params.name = "" // Output file name, will default to the name of the FA file if not set
 
 
 process bgzip 
@@ -340,6 +340,19 @@ process createSegregationTables
     """
 }
 
+// Function to check if a variable is an integer
+def isInteger(value) {
+    if (value == null) {
+        return false
+    }
+    if (value instanceof Integer) {
+        return value >= 0
+    }
+    else {
+        return false
+    }
+}
+
 workflow 
 {
     // Asserts
@@ -348,6 +361,19 @@ workflow
         if (!outputFolder.exists()) {
             outputFolder.mkdirs()
         }
+    }
+
+    if (!isInteger(params.min_ratio)) {
+        error "Provided min_ratio must be a non-negative integer, is ${params.min_ratio}."
+        System.exit(1)
+    }
+    if (!isInteger(params.min_depth)) {
+        error "Provided min_depth must be a non-negative integer, is ${params.min_depth}."
+        System.exit(2)
+    }
+    if (!isInteger(params.cutoff)) {
+        error "Provided cutoff must be a non-negative integer, is ${params.cutoff}."
+        System.exit(3)
     }
 
     // Inputs

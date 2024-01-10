@@ -77,7 +77,7 @@ Random testing data are provided as a part of the package. Run the following com
 * `--bins [int]` the bin sizes to be used, `default=[50000, 100000, 200000]`,
 * `--out path` a path to a folder where the output is stored, `default=./out`,
 * `--min_depth int` a minimum read depth per SNP to be included, `default=1`,
-* `--max_pval float` a position is determined to be mono-allelic using two-sided binomial test in [BCFTools](https://samtools.github.io/bcftools/bcftools.html#expressions), `default=0.01`, (The test considers the likelihood of seeing the count of dominant allele out of all reads. E.g. 15 out of 18 is p=0.0075 and hence would pass.)
+* `--min_ratio int` tests that dominant base for a SNP is at least `min_ratio` times more often present than the remaining ovserved bases [BCFTools](https://samtools.github.io/bcftools/bcftools.html#expressions), `default=5`
 * `--cutoff int` maximum distance from a read to a closest so that the read is still matched to the SNP, `default=0`.
 
 
