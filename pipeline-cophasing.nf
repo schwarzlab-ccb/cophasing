@@ -138,50 +138,9 @@ process filterSites {
     
     // Filter only if the read depth is above the minimum and the most represented base occurs at least params.max_ratio more often than the rest of the bases
     script:
-    filter_four = """
-        (FORMAT/AD[0:3] >= 0) 
-        && 
-        (
-            (
-                (FORMAT/AD[0:0] > FORMAT/AD[0:1]) 
-                && 
-                (FORMAT/AD[0:0] < (FORMAT/AD[0:1] + FORMAT/AD[0:2] + FORMAT/AD[0:3]) * ${params.min_ratio})
-            ) 
-            || 
-            (
-                (FORMAT/AD[0:0] <= FORMAT/AD[0:1])
-                && 
-                (FORMAT/AD[0:1] < (FORMAT/AD[0:0] + FORMAT/AD[0:2] + FORMAT/AD[0:3]) * ${params.min_ratio})
-            )
-        )"""
-    filter_three = """  
-        (FORMAT/AD[0:2] >= 0) 
-        && 
-        (
-            (
-                (FORMAT/AD[0:0] > FORMAT/AD[0:1]) 
-                && 
-                (FORMAT/AD[0:0] < (FORMAT/AD[0:1] + FORMAT/AD[0:2]) * ${params.min_ratio})
-            ) 
-            || 
-            (
-                (FORMAT/AD[0:0] <= FORMAT/AD[0:1])
-                && 
-                (FORMAT/AD[0:1] < (FORMAT/AD[0:0] + FORMAT/AD[0:2]) * ${params.min_ratio})
-            )
-        )"""
-    filter_two = """
-        (
-            (FORMAT/AD[0:0] > FORMAT/AD[0:1]) 
-            && 
-            (FORMAT/AD[0:0] < FORMAT/AD[0:1] * ${params.min_ratio})
-        )
-        ||
-        (
-            (FORMAT/AD[0:0] <= FORMAT/AD[0:1]) 
-            && 
-            (FORMAT/AD[0:1] < FORMAT/AD[0:0] * ${params.min_ratio})
-        )"""
+    filter_four = "(FORMAT/AD[0:3] > 0)"
+    filter_three = "(FORMAT/AD[0:2] > 0) && (FORMAT/AD[0:0] > 0)"
+    filter_two = "(FORMAT/AD[0:0] > 0) && (FORMAT/AD[0:1] > 0)"
     filter_depth = "FORMAT/DP[0:0] < $params.min_depth"
     """
     bcftools filter -e "($filter_depth) || ($filter_two) || ($filter_three) || ($filter_four)" $vcf > ${name}.mono
