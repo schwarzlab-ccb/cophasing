@@ -109,7 +109,7 @@ process bcftoolsAnnotate
     tuple val(name), path(pileup)
     
     output:
-    tuple val(name), path("${name}.annotated.vcf")
+    tuple val(name), path("${name}.genotyped.vcf")
 
     script:
     // The sample name is not the same between the Pileup and the reference, needs to be matched, hence the samples.txt file
@@ -123,6 +123,7 @@ process bcftoolsAnnotate
     bgzip ${name}.fill.vcf
     tabix ${name}.fill.vcf.gz    
     bcftools annotate -a $vcf -c FORMAT/GT ${name}.fill.vcf.gz -S samples.txt > ${name}.annotated.vcf
+    bcftools view -i 'FORMAT/GT!="."' ${name}.annotated.vcf > ${name}.genotyped.vcf
     """
 }
 
