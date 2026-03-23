@@ -1,3 +1,5 @@
+// Created by adam.streck@mdc-berlin.de, 2023
+
 nextflow.enable.dsl=2
 
 // Default parameter values
