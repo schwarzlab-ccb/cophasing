@@ -1,13 +1,13 @@
-# Cophasing #
+# Cophasing (v1.0.0)
 
 Nextflow-based pipeline for cophasing of GAM reads.
 
 ## Pipeline
 
 ### Input:
-1. GAM experiemt samples in the BAM format,
+1. GAM experiment samples in the BAM format,
 2. Reference genome in the FASTA format,
-3. **Phased** SNPs the in the VCF format.
+3. **Phased** SNPs in the VCF format.
 
 ### Output
 A set of tables of the form `{genome_name}.{bin_size}.{hap}.coverage.tsv` and `{genome_name}.{bin_size}.{hap}.segregation.tsv` for different bin sizes with the number of reads per bin per `sample`. Haplotype `hap` is either `hap1`, `hap2`, or `both`.  The columns are:
@@ -23,17 +23,17 @@ A set of tables of the form `{genome_name}.{bin_size}.{hap}.coverage.tsv` and `{
 #### Align reads to the reference haplotype
 1. filter out positions without phasing information
 2. convert VCF to BED format
-3. find the closest snip for each read and merge
+3. find the closest SNP for each read and merge
 
 #### Create bins
 1. bin the genome into fixed sized, non-overlapping windows of desired resolution, eg 50kb, 100kb, 200kb 
 
-#### Calculat coverage 
+#### Calculate coverage 
 1. for comparison, calculate the coverage of each window using the original unsplit GAM samples,
 2. calculate coverage files of all split GAM samples for each haplotype,
 3. combine coverage files of all samples into one coverage table, per resolution
 
-The coverated table describes the number of **bases** covered by reads in each window, therefore it is possible that the sum of coverage from both haplotypes is higher than the total number of bases covered in a window, as some bases may be covered by both haplotypes.
+The coverage table describes the number of **bases** covered by reads in each window; therefore, it is possible that the sum of coverage from both haplotypes is higher than the total number of bases covered in a window, as some bases may be covered by both haplotypes.
 
 ![Pipeline-Cophasing](./doc/pipeline_cophasing_chart.png)
 
@@ -47,7 +47,7 @@ Use the provided conda environment file `pcp-env.yaml` to install all the requir
 
 ## Execution
 
-To execure run:
+To execute, run:
 
 `nextflow run pipeline-cophasing.nf [parameters]`
 
@@ -77,7 +77,7 @@ Random testing data are provided as a part of the package. Run the following com
 * `--bins [int]` the bin sizes to be used, `default=[50000, 100000, 200000]`,
 * `--out path` a path to a folder where the output is stored, `default=./out`,
 * `--min_depth int` a minimum read depth per SNP to be included, `default=1`,
-* `--min_ratio int` tests that dominant base for a SNP is at least `min_ratio` times more often present than the remaining ovserved bases [BCFTools](https://samtools.github.io/bcftools/bcftools.html#expressions), `default=5`
+* `--min_ratio int` tests that the dominant base for a SNP is at least `min_ratio` times more often present than the remaining observed bases [BCFTools](https://samtools.github.io/bcftools/bcftools.html#expressions), `default=5`
 * `--cutoff int` maximum distance from a read to a closest so that the read is still matched to the SNP, `default=0`.
 
 
@@ -86,7 +86,7 @@ Random testing data are provided as a part of the package. Run the following com
 A sample visualization method is shown in the notebook `NMPI_matrix_vis.ipynb`. This notebook loads a singular segregation table and plots a contact map for one chromosome in a specified region. 
 
 ## Authors
-This pipeline has been developed at Max Delbr�ck Center for Molecular Medicine, Berlin. Authors:
+This pipeline has been developed at Max Delbrück Center for Molecular Medicine, Berlin. Authors:
 
 * Dr. Adam Streck: pipeline development,
 * Dr. Julia Markowski: creator of the co-phasing method,
