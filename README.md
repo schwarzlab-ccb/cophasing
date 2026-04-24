@@ -1,4 +1,4 @@
-# Pipeline-Cophasing (PCP) #
+# Cophasing #
 
 Nextflow-based pipeline for cophasing of GAM reads.
 

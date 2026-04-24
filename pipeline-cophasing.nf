@@ -208,7 +208,7 @@ process findClosesBed
     """
 }
 
-// TODO: This should be improved - currently the original reads are filtered by info in the closest.bed, but the file itself could be used
+// NOTE: This could be improved
 process splitBamFilesToHaps 
 {
     publishDir "${params.debug_out}/${task.process}", mode: "copy", enabled: params.debug_out != ""
