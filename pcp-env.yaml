@@ -9,6 +9,7 @@ dependencies:
   - bcftools
   - bedtools
   - samtools
+  - tabix
   - vcftools
   - bedops
   - gatk4

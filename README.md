@@ -93,7 +93,7 @@ This pipeline has been developed at Max Delbr�ck Center for Molecular Medicine
 * Dr. Alexander Kukalev: creator of the separation algorithm.
 
 ## Contact
-Email questions, feature requests and bug reports to **Adam Streck, adam.streck@mdc-berlin.de**.
+Email questions, feature requests and bug reports to **Adam Streck, adam.streck@iccb-cologne.org**.
 
 ## License
-Pipeline-Cophasing is available under the MIT License. 
+This repository is available under the MIT License. 
