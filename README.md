@@ -49,7 +49,7 @@ Use the provided conda environment file `pcp-env.yaml` to install all the requir
 
 To execute, run:
 
-`nextflow run pipeline-cophasing.nf [parameters]`
+`nextflow run main.nf [parameters]`
 
 ### Output
 
@@ -59,7 +59,7 @@ By default the results are written to the `./out` folder.
 
 Random testing data are provided as a part of the package. Run the following command to test the pipeline:
 
-`nextflow run pipeline-cophasing.nf -c test_data.config` 
+`nextflow run main.nf -c test_data.config` 
 
 **NOTE:** The parameters for the execution are stored in the Nextflow configuration file `test_data.config`.
 
