@@ -2,7 +2,7 @@
 
 Nextflow-based pipeline for cophasing of GAM reads.
 
-## Pipeline
+## Cophasing Pipeline
 
 ### Input:
 1. GAM experiment samples in the BAM format,
@@ -80,17 +80,43 @@ Random testing data are provided as a part of the package. Run the following com
 * `--min_ratio int` tests that the dominant base for a SNP is at least `min_ratio` times more often present than the remaining observed bases [BCFTools](https://samtools.github.io/bcftools/bcftools.html#expressions), `default=5`
 * `--cutoff int` maximum distance from a read to a closest so that the read is still matched to the SNP, `default=0`.
 
-
 ### Visualization
 
 A sample visualization method is shown in the notebook `NMPI_matrix_vis.ipynb`. This notebook loads a singular segregation table and plots a contact map for one chromosome in a specified region. 
 
+## Permutation Test Pipeline
+
+A downstream Nextflow-based pipeline that takes the segregation tables produced by the Cophasing pipeline and identifies differential contacts between haplotypes using permutation testing.
+
+
+### Input
+The output directory of the main co-phasing pipeline (`--out`).
+
+### Output
+Results are written to subdirectories inside `output_dir`:
+* `01_curated_segregation_tables/` — segregation tables after WDF-based dat curation
+* `02_permutation_test/` — per-chromosome permutation test results (`.pkl`)
+* `03_thresholds/` — knee-point threshold tables (`.tsv`) per chromosome
+* `04_cool_files/` — contact matrices in `.cool` format for differential contacts
+
+### Process
+1. **Curation** — filters segregation tables based on windowed deviation from median (WDF), removing low-quality bins using `high_factor` and `low_factor` thresholds
+2. **Permutation test** — runs a chromosome-level permutation test (`num_perm` permutations) to calculate empirical p-values for each contact
+3. **Threshold identification** — identifies a significance threshold per chromosome
+4. **Cool file generation** — converts significant permutation test results into `.cool` contact matrices
+
+
+### Execution
+`nextflow run pipeline-permutation-test.nf -c permutation_test.config`
+
+
 ## Authors
 This pipeline has been developed at Max Delbrück Center for Molecular Medicine, Berlin. Authors:
 
-* Dr. Adam Streck: pipeline development,
+* Dr. Adam Streck: cophasing pipeline development,
 * Dr. Julia Markowski: creator of the co-phasing method,
-* Dr. Alexander Kukalev: creator of the separation algorithm.
+* Dr. Alexander Kukalev: creator of the separation algorithm,
+* Claudia Robens: permutation test pipeline development.
 
 ## Contact
 Email questions, feature requests and bug reports to **Adam Streck, adam.streck@iccb-cologne.org**.
