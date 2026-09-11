@@ -19,3 +19,8 @@ dependencies:
   - pip
   - pandas
   - numpy
+  - scipy
+  - matplotlib
+  - cooler
+  - pip:
+    - kneed
