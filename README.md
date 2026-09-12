@@ -105,6 +105,70 @@ Results are written to subdirectories inside `output_dir`:
 3. **Threshold identification** — identifies a significance threshold per chromosome
 4. **Cool file generation** — converts significant permutation test results into `.cool` contact matrices
 
+```mermaid
+---
+config:
+  flowchart:
+    nodeSpacing: 25
+    rankSpacing: 20
+    diagramPadding: 4
+---
+flowchart TD
+    IN[/"CoPhasing output\nhap1 · hap2 · both\nsegregation tables"/]
+
+    IN ==> S1
+
+    subgraph S1["`① **Curation**`"]
+        P1["Window detection frequency-based bin filtering\ncurates segregation tables and generates masking file"]
+    end
+
+    S1 ==> CUR[/"curated_*_cutoff.*.hap1.segregation.tsv\ncurated_*_cutoff.*.hap2.segregation.tsv\ncurated_*_cutoff.*.both.segregation.tsv"/]
+    S1 ==> BINS[/"bins_rm_hap1_hap2.tsv"/]
+
+    CUR ==> S2
+    BINS ==> S2
+
+    subgraph S2["`② **Permutation Test**`"]
+        P2["per chromosome<br/>• calculate contact frequencies (CF) per haplotype<br/>• calculate ∆CF (hap1-hap2)<br/>• build null distribution by randomly reshuffling segregation tables across haplotypes"]
+    end
+
+    S2 ==> PKL[/"permutation_test_results\n_chr_multiprocessing.pkl"/]
+
+    PKL ==> S3
+    BINS ==> S3
+
+    subgraph S3["`③ **Threshold Identification**`"]
+        P3["• p-value calculation<br/>• normalized Gaussian smoothing<br/>• knee-point detection per chromosome"]
+    end
+
+    S3 ==> KNEE[/"knee_point_table_threshold_steps.tsv"/]
+    S3 ==> RATIO[/"ratios_table_threshold_steps.tsv\nratio_differential_contacts_info.tsv"/]
+
+    CUR ==> S4
+    PKL ==> S4
+    KNEE ==> S4
+    BINS ==> S4
+
+    subgraph S4["`④ **Cool File Generation**`"]
+        P4["per chromosome<br/>• Identifiction of differential contacts based on thresholding<br/>• save results as long format .tsv and .cool files"]
+    end
+
+    S4 ==> COOL[/"permutation_test_results_*.cool\npermutation_test_results_*.tsv.gz"/]
+
+    classDef input fill:#b5c7eb,stroke:#0d47a1,color:#000,stroke-width:2px;
+    classDef process fill:#f5f5f5,stroke:#555555,color:#000,stroke-width:2px;
+    classDef file fill:#99c5c4,stroke:#008080,color:#000,stroke-width:2px;
+    classDef output fill:#ffe2a6,stroke:#ffcc80,color:#000,stroke-width:2px;
+
+
+    class IN input;
+    class P1,P2,P3,P4 process;
+    class CUR,BINS,PKL,KNEE,RATIO file;
+    class COOL output;
+
+    classDef leftAlign text-align:left;
+    class P1,P2,P3,P4 leftAlign;
+```
 
 ### Execution
 `nextflow run pipeline-permutation-test.nf -c permutation_test.config`
