@@ -113,7 +113,7 @@ config:
     rankSpacing: 20
     diagramPadding: 4
 ---
-flowchart LR
+flowchart TD
     IN[/"CoPhasing output\nhap1 · hap2 · both\nsegregation tables"/]
 
     IN ==> S1
