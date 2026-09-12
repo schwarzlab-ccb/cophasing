@@ -112,8 +112,10 @@ config:
     nodeSpacing: 25
     rankSpacing: 20
     diagramPadding: 4
+  themeVariables:
+    fontSize: 25px
 ---
-flowchart TD
+flowchart LR
     IN[/"CoPhasing output\nhap1 · hap2 · both\nsegregation tables"/]
 
     IN ==> S1
