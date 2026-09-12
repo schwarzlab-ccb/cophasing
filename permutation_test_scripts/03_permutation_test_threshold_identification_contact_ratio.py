@@ -12,9 +12,8 @@ import glob # used to autocomplete filenames
 from kneed import KneeLocator # to find the knee point in a curve 
 from pathlib import Path
 import logging
-import csv
 
-# define args
+
 """
 Command-line arguments
 """
@@ -56,8 +55,6 @@ knee_points = {}
 """
 CALCULATE RATIOS AND KNEE-POINT FOR ALL CHROMOSOMES
 WITHOUT NAN VALUES AS TOTAL
-and
-ALL CONTACTS AS TOTAL
 """
 # Iterate over all chromosomes
 for chrom in chromosomes:
@@ -139,8 +136,6 @@ total number excluding masked nan values
 """
 knee_df = knee_df.set_index('chromosome')
 
-
-
 print("\n" + "="*40)
 print("Thresholds calculated for all chromosomes using the knee point method.")
 print("="*40 + "\n")
@@ -194,24 +189,11 @@ print("Ratios calculated for all chromosomes using the determined threshold per 
 print("="*40 + "\n")
 
 
-
-
-
 """save as tsv file"""
-
-with open(f'{threshold_ratio_total_wo_nan_output_dir}/Ratio_differential_contacts_threshold_chromosomes.tsv', "w", newline="") as f:
-    writer = csv.writer(f, delimiter="\t")
-    writer.writerow(["chromosome", "hap1", "hap2"])
-    
-    for chr_ in chromosomes:
-        writer.writerow([
-            chr_,
-            ratios_hap1_dict.get(chr_, ""),   # empty string if missing
-            ratios_hap2_dict.get(chr_, "")
-        ])
-        
-
-df_ratio = pd.read_csv(f'{threshold_ratio_total_wo_nan_output_dir}/Ratio_differential_contacts_threshold_chromosomes.tsv', sep='\t')
+df_ratio = pd.DataFrame([
+    {"chromosome": chr_, "hap1": ratios_hap1_dict.get(chr_, None), "hap2": ratios_hap2_dict.get(chr_, None)}
+    for chr_ in chromosomes
+])
 df_threshold = pd.read_csv(f'{threshold_ratio_total_wo_nan_output_dir}/knee_point_table_threshold_steps.tsv', sep='\t', index_col=0)
 df_threshold = df_threshold.rename(columns={"knee": "threshold"})
 df_ratio_threshold = df_ratio.merge(df_threshold, on="chromosome", how="left")
@@ -220,6 +202,6 @@ df_ratio_threshold['hap1_percentage'] = (df_ratio_threshold['hap1'] * 100).round
 df_ratio_threshold['hap2_percentage'] = (df_ratio_threshold['hap2'] * 100).round(2)
 df_ratio_threshold['combined_percentage'] = (df_ratio_threshold['hap1_percentage'] + df_ratio_threshold['hap2_percentage']).round(2)
 
-df_ratio_threshold.to_csv(f'{threshold_ratio_total_wo_nan_output_dir}/Ratio_differential_contacts_percentage_threshold_chromosomes_table.tsv', sep="\t", index=False)
+df_ratio_threshold.to_csv(f'{threshold_ratio_total_wo_nan_output_dir}/ratio_differential_contacts_info.tsv', sep="\t", index=False)
 
 
