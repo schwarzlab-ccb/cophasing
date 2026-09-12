@@ -113,7 +113,7 @@ config:
     rankSpacing: 20
     diagramPadding: 4
   themeVariables:
-    fontSize: 25px
+    fontSize: 30px
 ---
 flowchart LR
     IN[/"CoPhasing output\nhap1 · hap2 · both\nsegregation tables"/]
