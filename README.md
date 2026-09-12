@@ -109,13 +109,14 @@ Results are written to subdirectories inside `output_dir`:
 ---
 config:
   flowchart:
-    nodeSpacing: 25
-    rankSpacing: 20
-    diagramPadding: 4
+    nodeSpacing: 2
+    rankSpacing: 5
+    diagramPadding: 1
+    padding: 1
   themeVariables:
-    fontSize: 30px
+    fontSize: 8px
 ---
-flowchart LR
+flowchart TD
     IN[/"CoPhasing output\nhap1 · hap2 · both\nsegregation tables"/]
 
     IN ==> S1
