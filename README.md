@@ -94,7 +94,7 @@ The output directory of the main co-phasing pipeline (`--out`).
 
 ### Output
 Results are written to subdirectories inside `output_dir`:
-* `01_curated_segregation_tables/` — segregation tables after WDF-based dat curation
+* `01_curated_segregation_tables/` — segregation tables after WDF-based data curation
 * `02_permutation_test/` — per-chromosome permutation test results (`.pkl`)
 * `03_thresholds/` — knee-point threshold tables (`.tsv`) per chromosome
 * `04_cool_files/` — contact matrices in `.cool` format
@@ -132,7 +132,7 @@ flowchart TD
     BINS ==> S2
 
     subgraph S2["`② **Permutation Test**`"]
-        P2["per chromosome<br/>• calculate contact frequencies (CF) per haplotype<br/>• calculate ∆CF (hap1-hap2)<br/>• build null distribution by randomly reshuffling segregation tables across haplotypes"]
+        P2["• calculate contact frequencies (CF) per haplotype<br/>• calculate ∆CF (hap1-hap2)<br/>• build null distribution by randomly reshuffling segregation tables across haplotypes"]
     end
 
     S2 ==> PKL[/"permutation_test_results\n_chr_multiprocessing.pkl"/]
@@ -153,7 +153,7 @@ flowchart TD
     BINS ==> S4
 
     subgraph S4["`④ **Cool File Generation**`"]
-        P4["per chromosome<br/>• Identifiction of differential contacts based on thresholding<br/>• save results as long format .tsv and .cool files"]
+        P4["• Identifiction of differential contacts based on thresholding<br/>• save results as long format .tsv and .cool files"]
     end
 
     S4 ==> COOL[/"permutation_test_results_*.cool\npermutation_test_results_*.tsv.gz"/]
