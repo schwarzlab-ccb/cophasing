@@ -97,10 +97,10 @@ Results are written to subdirectories inside `output_dir`:
 * `01_curated_segregation_tables/` — segregation tables after WDF-based dat curation
 * `02_permutation_test/` — per-chromosome permutation test results (`.pkl`)
 * `03_thresholds/` — knee-point threshold tables (`.tsv`) per chromosome
-* `04_cool_files/` — contact matrices in `.cool` format for differential contacts
+* `04_cool_files/` — contact matrices in `.cool` format
 
 ### Process
-1. **Curation** — filters segregation tables based on windowed deviation from median (WDF), removing low-quality bins using `high_factor` and `low_factor` thresholds
+1. **Curation** — filters segregation tables based on windowed deviation from median (WDF), removing undersampled or oversampled bins
 2. **Permutation test** — runs a chromosome-level permutation test (`num_perm` permutations) to calculate empirical p-values for each contact
 3. **Threshold identification** — identifies a significance threshold per chromosome
 4. **Cool file generation** — converts significant permutation test results into `.cool` contact matrices
@@ -176,6 +176,19 @@ flowchart TD
 ### Execution
 `nextflow run pipeline-permutation-test.nf -c permutation_test.config`
 
+### Parameters
+
+* `--input_dir str`  input directory containing the cophasing pipeline output,
+* `--output_dir str`  path to a directory where results are stored,
+* `--chromosomes str`  comma-separated list of chromosomes to process (e.g. chr1,chr2,...,chr22),
+* `--output_dir str`  path to a directory where results are stored,
+* `--cutoff str`  cutoff value used in the cophasing pipeline (e.g. 10Mb),
+* `--resolution int` bin size in bp used in the cophasing pipeline (e.g. 40000),
+* `--num_perm int` number of permutations for the null distribution (e.g. 2000),
+* `--gaussian_kernel_size int` kernel size for Gaussian smoothing in threshold detection (e.g. 1),
+* `--high_factor float` upper WDF factor for marking oversampled bins, `default=1.8`,
+* `--low_factor float` lower WDF factor for marking undersampled bins, `default=1.8`,
+* `--pseudocount int` pseudocount added to contact frequencies, `default=0`,
 
 ## Authors
 This pipeline has been developed at Max Delbrück Center for Molecular Medicine, Berlin. Authors:
