@@ -110,8 +110,7 @@ def permutation_test_thread(perms):
         # mask values that are nan in one the two difference matrices in both matrices (17.09.2025)
         # Create mask where either matrix has NaN
         nan_mask = np.isnan(npmi_diff) | np.isnan(npmi_perm_diff)
-        # Apply mask to both matrices
-        npmi_diff[nan_mask] = np.nan
+        # Apply mask to matrix generated from permuted haplotypes
         npmi_perm_diff[nan_mask] = np.nan
         # perm greater than original for two-sided test
         perm_greater_mask = npmi_perm_diff > npmi_diff
