@@ -39,7 +39,7 @@ def get_WDF(segregation_table):
 
 
 def curate_segtable_with_mean_WDF_exclude_zeros(segregation_table, high_factor=1.5, low_factor=1.5):
-     """    
+    """
         Curate a segregation table by removing windows with outlier WDF values.
         
         Notes:
@@ -48,7 +48,7 @@ def curate_segtable_with_mean_WDF_exclude_zeros(segregation_table, high_factor=1
         Adapted by Claudia Robens: 
         split factor into separate high_factor and low_factor to allow asymmetric thresholds; 
         added defensive copy of WDF_values before zero-masking; 
-        updated DataFrame.append()to _append().
+        updated DataFrame.append() to pd.concat().
     """
     segtable = segregation_table.copy()
     chrom_list = get_chromosomes_list(segtable)
@@ -68,7 +68,7 @@ def curate_segtable_with_mean_WDF_exclude_zeros(segregation_table, high_factor=1
         low_threshold = mean_WDF - low_factor * sigma_WDF
         curated_WDF_index = subset_WDF.query('WDF <= @low_threshold or WDF >= @high_threshold')
         curated_segtable.loc[curated_WDF_index.index] = 0
-        removed_regions_df = removed_regions_df._append(curated_WDF_index, ignore_index=True)
+        removed_regions_df = pd.concat([removed_regions_df, curated_WDF_index], ignore_index=True)
     curated_segtable.index = segregation_table.index
     total_windows = len(curated_segtable)
     removed_windows = len(removed_regions_df)
