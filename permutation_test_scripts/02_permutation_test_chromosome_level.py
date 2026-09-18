@@ -31,6 +31,8 @@ parser.add_argument('--num_perm', type=int, required=True, help='number of permu
 parser.add_argument('--chr', type=str, required=True, help='target chromosome chr1, chr2, etc.')
 parser.add_argument('--pseudocount', type=int, default=0, help='pseudocount added to numerator and denominator when calculating NPMI, default is 0')
 parser.add_argument("--out", required=True)  
+parser.add_argument('--num_workers', type=int, default=10, help='number of parallel worker processes')
+
 
 args = parser.parse_args()
 
@@ -86,10 +88,18 @@ indices = list(range(subset_segtable_hap1.shape[1]*2)) # number of samples in th
 np.random.seed(42)
 # create permutations of the indices which are used later on for the permutation test
 permutations = [np.random.permutation(indices) for _ in range(args.num_perm)]
-blocksize = args.num_perm//10
-blocks = [permutations[i*blocksize:(i+1)*blocksize] for i in range(10)] # split permutations into 10 blocks of blocksize number of permutations each
+# blocksize = args.num_perm//10
+# blocks = [permutations[i*blocksize:(i+1)*blocksize] for i in range(10)] # split permutations into 10 blocks of blocksize number of permutations each
+# 
+# blocks = [permutations[i::10] for i in range(min(10, args.num_perm))]
+# use the number of workers to split the permutations into blocks for parallel processing
+blocks = [permutations[i::args.num_workers] for i in range(min(args.num_workers, args.num_perm))]
+total = sum(len(b) for b in blocks)
+sizes = [len(b) for b in blocks]
 print("\n" + "="*40)
-print("Blocks defined for permutation.")
+print(f"{len(blocks)} blocks defined for permutation.")
+print(f"num_perm={args.num_perm:4d}: {len(blocks)} blocks, sizes={sizes}, total={total}, ok={total==args.num_perm}")
+
 
 """
 function that performs permutation test for each block of permutations
@@ -129,7 +139,9 @@ print("permutation test function defined.")
 
 if __name__ == '__main__':
     # Create a pool with 10 processes
-    with Pool(processes=10) as pool:
+    # with Pool(processes=10) as pool:
+    # use the number of workers specified in the command-line arguments to create a pool of processes
+    with Pool(processes=args.num_workers) as pool:
         # Map compute_pxy_parallel function across all matrices
         results = pool.map(permutation_test_thread, blocks)
         pool.close()
