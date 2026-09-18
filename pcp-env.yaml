@@ -21,6 +21,7 @@ dependencies:
   - numpy
   - scipy
   - matplotlib
+  - requests 
   - cooler
   - pip:
     - kneed
