@@ -21,12 +21,13 @@ process CurateSegregationTables {
 
 process PermutationTestChromosomeLevel {
     tag { chr }
+    cpus params.num_workers    
 
     publishDir "${params.output_dir}/02_permutation_test", mode: 'copy'
 
     input:
     val chr
-    val _ready
+    path _ready  // curation log path — cache invalidated when step 1 reruns
 
     output:
     tuple val(chr), path("permutation_test_results_${chr}_multiprocessing.pkl"), path("${chr}.log")
@@ -40,6 +41,7 @@ process PermutationTestChromosomeLevel {
         --resolution ${params.resolution} \\
         --chr ${chr} \\
         --num_perm ${params.num_perm} \\
+        --num_workers ${params.num_workers} \\
         --pseudocount ${params.pseudocount} \\
         --out permutation_test_results_${chr}_multiprocessing.pkl \\
         > ${chr}.log 2>&1
@@ -50,7 +52,7 @@ process IdentifyThresholds {
     tag "threshold_identification"
 
     input:
-    val n_results
+    path perm_results  // actual pkl files — content hash changes when step 2 reruns
 
     output:
     path "03_permutation_test_threshold_identification_contact_ratio.log"
@@ -69,8 +71,7 @@ process GenerateCoolFromPerm {
     tag { chr }
 
     input:
-    val(chr)
-    val _ready
+    tuple val(chr), path(_ready)  // threshold log path — cache invalidated when step 3 reruns
 
     output:
     path "04_cool_file_${chr}.log"
@@ -93,12 +94,12 @@ workflow {
 
     curation_done = CurateSegregationTables()
 
-    perm_chr = PermutationTestChromosomeLevel(chr_channel, curation_done.map { true })
+    perm_chr = PermutationTestChromosomeLevel(chr_channel, curation_done)
 
-    trigger_perm_complete = perm_chr.count()
+    // Collect actual pkl files so their content hashes drive IdentifyThresholds cache
+    all_pkl_files = perm_chr.map { _chr, pkl, _log -> pkl }.collect()
+    thresh_done_log = IdentifyThresholds(all_pkl_files)
 
-    thresh_done_log = IdentifyThresholds(trigger_perm_complete)
-
-    thresh_ready = thresh_done_log.map { true }
-    GenerateCoolFromPerm(chr_channel, thresh_ready)
+    // combine() pairs each chromosome with the threshold log — works for any number of chromosomes
+    GenerateCoolFromPerm(chr_channel.combine(thresh_done_log))
 }
