@@ -95,9 +95,15 @@ for chrom in chromosomes:
         # without nan values
         knee = KneeLocator(thresholds[1:], ratios[1:], curve='convex', direction='decreasing')
         knee_points[chrom] = knee.knee
+        if knee.knee is None:
+            logging.warning(f"{chrom}: KneeLocator returned None (flat or monotonic ratio curve). "
+                            "Threshold will be NaN — downstream no differential contacts will be identified.")
     elif threshold_step_size == 0.05:
         knee = KneeLocator(thresholds[3:], ratios[3:], curve='convex', direction='decreasing')
         knee_points[chrom] = knee.knee
+        if knee.knee is None:
+            logging.warning(f"{chrom}: KneeLocator returned None (flat or monotonic ratio curve). "
+                            "Threshold will be NaN — downstream no differential contacts will be identified.")
    
 
 """
