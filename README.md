@@ -153,7 +153,7 @@ flowchart TD
     BINS ==> S4
 
     subgraph S4["`④ **Cool File Generation**`"]
-        P4["• Identifiction of differential contacts based on thresholding<br/>• save results as long format .tsv and .cool files"]
+        P4["• Identification of differential contacts based on thresholding<br/>• save results as long format .tsv and .cool files"]
     end
 
     S4 ==> COOL[/"permutation_test_results_*.cool\npermutation_test_results_*.tsv.gz"/]
@@ -178,10 +178,11 @@ flowchart TD
 
 ### Parameters
 
-* `--input_dir str`  input directory containing the cophasing pipeline output,
-* `--output_dir str`  path to a directory where results are stored,
+* `--input_dir path`  input directory containing the cophasing pipeline output,
+* `--output_dir path`  path to a directory where results are stored,
+* `--fa path`  path to reference genome FASTA file (`.fa` or `.fa.gz`),
+* `--assembly str` assembly name written into the `.cool` file header by cooler (e.g. `hg38`, `hg19`),
 * `--chromosomes str`  comma-separated list of chromosomes to process (e.g. chr1,chr2,...,chr22),
-* `--output_dir str`  path to a directory where results are stored,
 * `--cutoff str`  cutoff value used in the cophasing pipeline (e.g. 10Mb),
 * `--resolution int` bin size in bp used in the cophasing pipeline (e.g. 40000),
 * `--num_perm int` number of permutations for the null distribution (e.g. 2000),
