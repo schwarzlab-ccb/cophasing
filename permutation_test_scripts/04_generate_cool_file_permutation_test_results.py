@@ -22,6 +22,7 @@ import numpy as np
 from pathlib import Path
 import gzip
 import subprocess
+import shlex
 import os
 import glob
 import argparse
@@ -46,6 +47,8 @@ parser.add_argument('--resolution', type=int, required=True,
                     help='The resolution which was used for Co-Phasing pipeline, e.g. 40000')
 parser.add_argument('--gaussian_kernel_size', type=int, required=True,
                     help='Kernel size used for Gaussian filter')
+parser.add_argument('--assembly', type=str, required=True,
+                    help='Reference genome assembly name passed to cooler, e.g. "hg38" or "hg19"')
 
 args = parser.parse_args()
 logging.info("args done.")
@@ -216,55 +219,50 @@ print("="*40 + "\n")
 
 
 """
-create bed file which contains all the genomic windows 
-
-for example with a resolution of 50000:
-
-chr1 0 50000
-
-chr1 50000 100000
+get bed file with all the genomic windows (e.g. chr1 0 50000) 
 """
 print("\n" + "="*40)
 
 output_bed_file_path = str(Path(args.output_dir) / '04_cool_files' / f'res_{args.resolution}_genomic_windows.bed')
+bed_df = pd.read_csv(output_bed_file_path, sep='\t', header=None)
 
-# Check if the file exists
-if os.path.exists(output_bed_file_path):
-    # If the file exists, read it
-    bed_df = pd.read_csv(output_bed_file_path, sep='\t', header=None)
-    print(f"Data loaded from {output_bed_file_path}")
-else:
-    # If the file doesn't exist, save the DataFrame to a file
-    # Chromosome sizes table for H1 h-ESC UCSC hg38
-    url = "http://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes"
+# # Check if the file exists
+# if os.path.exists(output_bed_file_path):
+#     # If the file exists, read it
+#     bed_df = pd.read_csv(output_bed_file_path, sep='\t', header=None)
+#     print(f"Data loaded from {output_bed_file_path}")
+# else:
+#     # If the file doesn't exist, save the DataFrame to a file
+#     # Chromosome sizes table for H1 h-ESC UCSC hg38
+#     url = "http://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes"
 
-    response = requests.get(url)
-    response.raise_for_status()
+#     response = requests.get(url)
+#     response.raise_for_status()
 
-    hg38_chrom_sizes = {}
-    for line in response.text.strip().split("\n"):
-        chrom, size = line.split("\t")
-        hg38_chrom_sizes[chrom] = int(size)
-    autosomes = [f"chr{i}" for i in range(1, 23)]
-    chromosome_sizes = {c: hg38_chrom_sizes[c] for c in autosomes}
+#     hg38_chrom_sizes = {}
+#     for line in response.text.strip().split("\n"):
+#         chrom, size = line.split("\t")
+#         hg38_chrom_sizes[chrom] = int(size)
+#     autosomes = [f"chr{i}" for i in range(1, 23)]
+#     chromosome_sizes = {c: hg38_chrom_sizes[c] for c in autosomes}
 
 
-    # Create a DataFrame for the BED file
-    bed_data = []
+#     # Create a DataFrame for the BED file
+#     bed_data = []
 
-    for chrom, size in chromosome_sizes.items():
-        start = 0
-        while start < size:
-            end = min(start + int(args.resolution), size)  # don't exceed chromosome length
-            bed_data.append([chrom, start, end])
-            start += int(args.resolution)
+#     for chrom, size in chromosome_sizes.items():
+#         start = 0
+#         while start < size:
+#             end = min(start + int(args.resolution), size)  # don't exceed chromosome length
+#             bed_data.append([chrom, start, end])
+#             start += int(args.resolution)
 
-    # Convert the BED data to a DataFrame
-    bed_df = pd.DataFrame(bed_data, columns=['Chromosome', '0', str(args.resolution)])
-    # Save the DataFrame to a file
-    bed_df.to_csv(output_bed_file_path, sep='\t', index=False, header=False)
-    print(f"Output saved to {output_bed_file_path}")
-print("="*40 + "\n")
+#     # Convert the BED data to a DataFrame
+#     bed_df = pd.DataFrame(bed_data, columns=['Chromosome', '0', str(args.resolution)])
+#     # Save the DataFrame to a file
+#     bed_df.to_csv(output_bed_file_path, sep='\t', index=False, header=False)
+#     print(f"Output saved to {output_bed_file_path}")
+# print("="*40 + "\n")
 
 
 """
@@ -280,8 +278,12 @@ def create_cool_file(data='npmi_matrix_hap1'):
     cool_file_path = f'{directory_path}permutation_test_results_{data}_{args.chr}_nan_is_5.cool'
     output_file_path_nan = f'{directory_path}permutation_test_results_{data}_{args.chr}_long_matrix_nan_is_five.tsv.gz'
 
-    # Bash command to create cool file 
-    cool_command = f"zcat {output_file_path_nan} | grep -v start_x | cooler load -f bg2 --count-as-float --assembly hg38 --input-copy-status duplex {output_bed_file_path} - {cool_file_path}"
+    # Bash command to create cool file
+    cool_command = (
+        f"zcat {shlex.quote(output_file_path_nan)} | grep -v start_x | "
+        f"cooler load -f bg2 --count-as-float --assembly {shlex.quote(args.assembly)} "
+        f"--input-copy-status duplex {shlex.quote(output_bed_file_path)} - {shlex.quote(cool_file_path)}"
+    )
     # Call the Bash command using subprocess
     subprocess.run(cool_command, check=True, shell=True, executable='/bin/bash')
     print(f"cool file has been generated for {data}: {cool_file_path}")    
