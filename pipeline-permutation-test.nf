@@ -67,28 +67,12 @@ process IdentifyThresholds {
     """
 }
 
-process GenerateBedFile {
-    publishDir "${params.output_dir}/04_cool_files", mode: 'copy'
-
-    input:
-    path fasta
-
-    output:
-    path "res_${params.resolution}_genomic_windows.bed"
-
-    script:
-    """
-    samtools faidx ${fasta}
-    bedtools makewindows -g ${fasta}.fai -w ${params.resolution} \
-        > res_${params.resolution}_genomic_windows.bed
-    """
-}
 
 process GenerateCoolFromPerm {
     tag { chr }
 
     input:
-    tuple val(chr), path(_ready), val(_bed_ready)  // val: ordering signal only, no file staging
+    tuple val(chr), path(_ready)
 
     output:
     path "04_cool_file_${chr}.log"
@@ -101,11 +85,9 @@ process GenerateCoolFromPerm {
         --cutoff ${params.cutoff} \\
         --resolution ${params.resolution} \\
         --gaussian_kernel_size ${params.gaussian_kernel_size} \\
-        --assembly '${params.assembly}' \\
         > 04_cool_file_${chr}.log 2>&1
     """
 }
-
 workflow {
     if (!file(params.input_dir).isAbsolute())
         error "input_dir must be an absolute path, got: ${params.input_dir}"
@@ -115,7 +97,6 @@ workflow {
     def chrs = params.chromosomes.tokenize(',')
     def chr_channel = Channel.fromList(chrs)
 
-    bed_file      = GenerateBedFile(Channel.fromPath(params.fa))
     curation_done = CurateSegregationTables()
 
     perm_chr = PermutationTestChromosomeLevel(chr_channel, curation_done)
@@ -124,7 +105,5 @@ workflow {
     all_pkl_files = perm_chr.map { _chr, pkl, _log -> pkl }.collect()
     thresh_done_log = IdentifyThresholds(all_pkl_files)
 
-    // map bed_file path to a string signal — creates ordering dependency without staging the file
-    bed_ready = bed_file.map { 'done' }
-    GenerateCoolFromPerm(chr_channel.combine(thresh_done_log).combine(bed_ready))
+    GenerateCoolFromPerm(chr_channel.combine(thresh_done_log))
 }
