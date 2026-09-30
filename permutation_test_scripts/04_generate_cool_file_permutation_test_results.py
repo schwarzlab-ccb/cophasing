@@ -272,9 +272,8 @@ ADJUST TO EITHER GENERATE COOL FILES FOR HAP1, HAP2, BOTH OR FOR PERMUTATION TES
 #########################
 # 
 def create_cool_file(data='npmi_matrix_hap1'):
-    cool_file_path = f'{directory_path}permutation_test_results_{data}_{args.chr}_nan_is_5.cool'
-    output_file_path_nan = f'{directory_path}permutation_test_results_{data}_{args.chr}_long_matrix_nan_is_five.tsv.gz'
-
+    cool_file_path = f'{directory_path}permutation_test_results_{data}_{args.chr}_nan.cool'
+    output_file_path_nan = f'{directory_path}permutation_test_results_{data}_{args.chr}_long_matrix_nan.tsv.gz'
     # Bash command to create cool file
     cool_command = f"zcat {output_file_path_nan} | grep -v start_x | cooler load -f bg2 --count-as-float --assembly hg38 --input-copy-status duplex {shlex.quote(output_bed_file_path)} - {shlex.quote(cool_file_path)}"
     # Call the Bash command using subprocess

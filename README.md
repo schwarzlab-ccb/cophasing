@@ -92,6 +92,12 @@ A downstream Nextflow-based pipeline that takes the segregation tables produced 
 ### Input
 The output directory of the main co-phasing pipeline (`--out`).
 
+**Naming convention requirement:** The directory name is controlled by the
+`name` parameter in the CoPhasing pipeline config file. For downstream
+compatibility, set it to follow this pattern: `*cophasing_*_{cutoff}_cutoff`, e.g.:
+`params { name = "cophasing_10Mb_cutoff" }`
+
+
 ### Output
 Results are written to subdirectories inside `output_dir`:
 * `01_curated_segregation_tables/` — segregation tables after WDF-based data curation
@@ -180,8 +186,6 @@ flowchart TD
 
 * `--input_dir path`  input directory containing the cophasing pipeline output,
 * `--output_dir path`  path to a directory where results are stored,
-* `--fa path`  path to reference genome FASTA file (`.fa` or `.fa.gz`),
-* `--assembly str` assembly name written into the `.cool` file header by cooler (e.g. `hg38`, `hg19`),
 * `--chromosomes str`  comma-separated list of chromosomes to process (e.g. chr1,chr2,...,chr22),
 * `--cutoff str`  cutoff value used in the cophasing pipeline (e.g. 10Mb),
 * `--resolution int` bin size in bp used in the cophasing pipeline (e.g. 40000),
@@ -190,6 +194,8 @@ flowchart TD
 * `--high_factor float` upper WDF factor for marking oversampled bins, `default=1.8`,
 * `--low_factor float` lower WDF factor for marking undersampled bins, `default=1.8`,
 * `--pseudocount int` pseudocount added to contact frequencies, `default=0`,
+
+**Note:** The permutation test pipeline is partially hg38-specific. 
 
 ## Authors
 This pipeline has been developed at Max Delbrück Center for Molecular Medicine, Berlin. Authors:
