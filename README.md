@@ -194,6 +194,7 @@ flowchart TD
 * `--high_factor float` upper WDF factor for marking oversampled bins, `default=1.8`,
 * `--low_factor float` lower WDF factor for marking undersampled bins, `default=1.8`,
 * `--pseudocount int` pseudocount added to contact frequencies, `default=0`,
+* `--num_workers int` number of parallel workers for the permutation test, `default=10`
 
 **Note:** The permutation test pipeline is partially hg38-specific. 
 
