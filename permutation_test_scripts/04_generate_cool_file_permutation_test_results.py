@@ -1,7 +1,6 @@
 """
 SCRIPT TO GENERATE COOL FILE OF NPMI MATRICES TO PLOT IN PYGENOMETRACKS
-Script to keep NaN values and in a second option, replace them with 5s
-Save both cool files in the same directory
+Script to keep NaN values in the output.
 Code by Claudia Robens
 """
 
@@ -13,8 +12,8 @@ logging.info("Script started.")
 """
 Imports
 """
-from post_permutation_test import find_and_load_pkl, process_permutation_results, process_permutation_results_thresh
-from generate_npmi import coordinates_from_location_string, get_region_from_location_string, calculate_NPMI, get_ticks, get_npmi_scale, read_segregation_table
+from post_permutation_test import find_and_load_pkl, process_permutation_results_thresh
+from generate_npmi import get_region_from_location_string, calculate_NPMI, read_segregation_table
 
 
 import pandas as pd
@@ -25,7 +24,6 @@ import subprocess
 import shlex
 import fcntl
 import os
-import glob
 import argparse
 import requests
 
@@ -176,43 +174,31 @@ os.makedirs(str(Path(args.output_dir) / '04_cool_files'), exist_ok=True)
 print("\n" + "="*40)
 
 
-def save_long_matrix_nan_5(chr, resolution, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path):
+def save_long_matrix_nan(chr, resolution, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path):
     npmi_matrix_df = add_chr_column(data_matrix, chr = chr, resolution = resolution)
     long_matrix = create_long_matrix(npmi_matrix_df)
 
-    # generate filename for cool file for hap2
-    output_file_path_long_mat = [f'{directory_path}permutation_test_results_{data}_{chr}_long_matrix_nan.tsv.gz']
-    output_file_path_long_mat = ''.join(output_file_path_long_mat)
+    output_file_path_long_mat = f'{directory_path}permutation_test_results_{data}_{chr}_long_matrix_nan.tsv.gz'
 
     with gzip.open(output_file_path_long_mat, 'wt', encoding='utf-8') as f:
         long_matrix.to_csv(f, sep='\t', index=False)
 
     print(f"Output {data} saved to {output_file_path_long_mat}")
 
-
-    long_matrix['value'] = long_matrix['value'].fillna(5)
-
-    output_file_path_nan = [f'{directory_path}permutation_test_results_{data}_{chr}_long_matrix_nan_is_five.tsv.gz']
-    output_file_path_nan = ''.join(output_file_path_nan)
-    with gzip.open(output_file_path_nan, 'wt', encoding='utf-8') as f:
-        long_matrix.to_csv(f, sep='\t', index=False)
-
-    print(f"Output {data} with NaN = 5 saved to {output_file_path_nan}")
-
 # p_value_log_filter_npmi
-save_long_matrix_nan_5(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_npmi', data_matrix=p_value_log_filter_npmi, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_npmi', data_matrix=p_value_log_filter_npmi, directory_path=directory_path)
 # p_value_log_filter_thresh_npmi
-save_long_matrix_nan_5(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_thresh_npmi', data_matrix=p_value_log_filter_thresh_npmi, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_thresh_npmi', data_matrix=p_value_log_filter_thresh_npmi, directory_path=directory_path)
 # p_value_log_filter_thresh_npmi_directionality
-save_long_matrix_nan_5(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_thresh_npmi_directionality', data_matrix=p_value_log_filter_thresh_npmi_directionality, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_thresh_npmi_directionality', data_matrix=p_value_log_filter_thresh_npmi_directionality, directory_path=directory_path)
 # p_value_npmi_2sided_updated
-save_long_matrix_nan_5(chr=args.chr, resolution = args.resolution, data='p_value_npmi_2sided_updated', data_matrix=p_value_npmi_2sided_updated, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='p_value_npmi_2sided_updated', data_matrix=p_value_npmi_2sided_updated, directory_path=directory_path)
 # npmi_matrix_hap1
-save_long_matrix_nan_5(chr=args.chr, resolution = args.resolution, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path)
 # npmi_matrix_hap2
-save_long_matrix_nan_5(chr=args.chr, resolution = args.resolution, data='npmi_matrix_hap2', data_matrix=npmi_matrix_hap2, directory_path=directory_path)
-# npmi_matrix_hap2
-save_long_matrix_nan_5(chr=args.chr, resolution = args.resolution, data='npmi_matrix_both', data_matrix=npmi_matrix_both, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='npmi_matrix_hap2', data_matrix=npmi_matrix_hap2, directory_path=directory_path)
+# npmi_matrix_both
+save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='npmi_matrix_both', data_matrix=npmi_matrix_both, directory_path=directory_path)
 print("="*40 + "\n")
 # #############
 
@@ -235,9 +221,9 @@ with open(lock_path, 'w') as lock_file:
         print(f"Data loaded from {output_bed_file_path}")
     else:
         # First task to acquire the lock: download and write
-url = "https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes"
+        url = "https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes"
 
-response = requests.get(url, timeout=30)
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
 
         hg38_chrom_sizes = {}
@@ -264,18 +250,12 @@ print("="*40 + "\n")
 
 """
 generate cool format file
-Adapted to keep NaN values and replace them with value 5
-
-ADJUST TO EITHER GENERATE COOL FILES FOR HAP1, HAP2, BOTH OR FOR PERMUTATION TEST RESULTS
-
 """
-#########################
-# 
 def create_cool_file(data='npmi_matrix_hap1'):
     cool_file_path = f'{directory_path}permutation_test_results_{data}_{args.chr}_nan.cool'
     output_file_path_nan = f'{directory_path}permutation_test_results_{data}_{args.chr}_long_matrix_nan.tsv.gz'
     # Bash command to create cool file
-cool_command = f"zcat {shlex.quote(output_file_path_nan)} | grep -v start_x | cooler load -f bg2 --count-as-float --assembly hg38 --input-copy-status duplex {shlex.quote(output_bed_file_path)} - {shlex.quote(cool_file_path)}"
+    cool_command = f"zcat {shlex.quote(output_file_path_nan)} | grep -v start_x | cooler load -f bg2 --count-as-float --assembly hg38 --input-copy-status duplex {shlex.quote(output_bed_file_path)} - {shlex.quote(cool_file_path)}"
     # Call the Bash command using subprocess
     subprocess.run(cool_command, check=True, shell=True, executable='/bin/bash')
     print(f"cool file has been generated for {data}: {cool_file_path}")    
@@ -292,5 +272,5 @@ create_cool_file(data='p_value_npmi_2sided_updated')
 create_cool_file(data='npmi_matrix_hap1')
 # npmi_matrix_hap2
 create_cool_file(data='npmi_matrix_hap2')
-# npmi_matrix_hap2
+# npmi_matrix_both
 create_cool_file(data='npmi_matrix_both')
