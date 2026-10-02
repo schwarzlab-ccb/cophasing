@@ -105,9 +105,9 @@ print(f"num_perm={args.num_perm:4d}: {len(blocks)} blocks, sizes={sizes}, total=
 function that performs permutation test for each block of permutations
 """
 def permutation_test_thread(perms):
-    perm_greater = np.zeros((size, size), dtype=np.uint16)
-    perm_smaller = np.zeros((size, size), dtype=np.uint16)
-    perm_equal = np.zeros((size, size), dtype=np.uint16)
+perm_greater = np.zeros((size, size), dtype=np.uint32)
+perm_smaller = np.zeros((size, size), dtype=np.uint32)
+perm_equal = np.zeros((size, size), dtype=np.uint32)
     for perm in perms:
         # get two permuted haplotypes
         permuted_hap1 = subset_segtable_joint[:,perm[:len(perm)//2]]
