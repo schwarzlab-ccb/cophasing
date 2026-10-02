@@ -235,9 +235,9 @@ with open(lock_path, 'w') as lock_file:
         print(f"Data loaded from {output_bed_file_path}")
     else:
         # First task to acquire the lock: download and write
-        url = "http://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes"
+url = "https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes"
 
-        response = requests.get(url)
+response = requests.get(url, timeout=30)
         response.raise_for_status()
 
         hg38_chrom_sizes = {}
