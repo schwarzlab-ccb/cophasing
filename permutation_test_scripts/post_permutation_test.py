@@ -89,7 +89,10 @@ def _apply_directionality(filtered_array, key):
     direction = filtered_array['directionality']
     negative = direction < 0
     filtered_array[key][negative] = -np.abs(filtered_array[key][negative])
-    filtered_array[key][direction == 0] = 0
+    # Only finite entries: with a positive pseudocount a WDF-masked bin can still have
+    # identical finite NPMI in both haplotypes, and zeroing it would replace its
+    # deliberate NaN with a 0 that step 03 counts as a real contact.
+    filtered_array[key][(direction == 0) & np.isfinite(filtered_array[key])] = 0
 
 
 def process_permutation_results(perm_results, chrom, bins_rm_f, gaussian_kernel_size=1):
