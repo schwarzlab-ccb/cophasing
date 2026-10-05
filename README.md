@@ -92,10 +92,12 @@ A downstream Nextflow-based pipeline that takes the segregation tables produced 
 ### Input
 The output directory of the main co-phasing pipeline (`--out`).
 
-**Naming convention requirement:** The directory name is controlled by the
-`name` parameter in the CoPhasing pipeline config file. For downstream
-compatibility, set it to follow this pattern: `*cophasing_*_{cutoff}_cutoff`, e.g.:
-`params { name = "cophasing_10Mb_cutoff" }`
+**Naming convention:** tables are located by `*_{cutoff}_cutoff.{resolution}.{hap}.segregation*`,
+falling back to `*.{resolution}.{hap}.segregation*` when nothing matches. Encoding the
+cutoff in the `name` parameter of the CoPhasing config keeps runs at the same resolution
+apart, e.g. `params { name = "cophasing_10Mb_cutoff" }`. It is only required when
+`input_dir` holds more than one run at a given resolution; the pipeline aborts rather
+than guessing if several tables still match.
 
 
 ### Output
