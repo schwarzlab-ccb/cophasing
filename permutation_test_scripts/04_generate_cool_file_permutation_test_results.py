@@ -22,10 +22,8 @@ from pathlib import Path
 import gzip
 import subprocess
 import shlex
-import fcntl
 import os
 import argparse
-import requests
 
 
 logging.info("imports done.")
@@ -46,6 +44,8 @@ parser.add_argument('--resolution', type=int, required=True,
                     help='The resolution which was used for Co-Phasing pipeline, e.g. 40000')
 parser.add_argument('--gaussian_kernel_size', type=int, required=True,
                     help='Kernel size used for Gaussian filter')
+parser.add_argument('--bed', type=str, required=True,
+                    help='BED of genomic windows that the cool files are binned on')
 parser.add_argument('--pseudocount', type=int, default=0,
                     help='Pseudocount used when calculating NPMI; must match the value used in step 02, default 0')
 
@@ -206,58 +206,13 @@ print("="*40 + "\n")
 
 
 """
-create bed file with all the genomic windows (e.g. chr1 0 50000) 
-"""
-print("\n" + "="*40)
-
-output_bed_file_path = str(Path(args.output_dir) / '04_cool_files' / f'res_{args.resolution}_genomic_windows.bed')
-
-# File lock ensures only one parallel chromosome task generates the BED file;
-# all others wait and then read the completed file.
-lock_path = output_bed_file_path + '.lock'
-with open(lock_path, 'w') as lock_file:
-    fcntl.flock(lock_file, fcntl.LOCK_EX)
-    if os.path.exists(output_bed_file_path):
-        # Another task already wrote it while we were waiting for the lock
-        bed_df = pd.read_csv(output_bed_file_path, sep='\t', header=None)
-        print(f"Data loaded from {output_bed_file_path}")
-    else:
-        # First task to acquire the lock: download and write
-        url = "https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes"
-
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-
-        hg38_chrom_sizes = {}
-        for line in response.text.strip().split("\n"):
-            chrom, size = line.split("\t")
-            hg38_chrom_sizes[chrom] = int(size)
-        autosomes = [f"chr{i}" for i in range(1, 23)]
-        chromosome_sizes = {c: hg38_chrom_sizes[c] for c in autosomes}
-
-        bed_data = []
-        for chrom, size in chromosome_sizes.items():
-            start = 0
-            while start < size:
-                end = min(start + int(args.resolution), size)
-                bed_data.append([chrom, start, end])
-                start += int(args.resolution)
-
-        bed_df = pd.DataFrame(bed_data, columns=['Chromosome', '0', str(args.resolution)])
-        bed_df.to_csv(output_bed_file_path, sep='\t', index=False, header=False)
-        print(f"Output saved to {output_bed_file_path}")
-# lock released here; all waiting tasks now proceed to read the completed file
-print("="*40 + "\n")
-
-
-"""
 generate cool format file
 """
 def create_cool_file(data='npmi_matrix_hap1'):
     cool_file_path = f'{directory_path}permutation_test_results_{data}_{args.chr}_nan.cool'
     output_file_path_nan = f'{directory_path}permutation_test_results_{data}_{args.chr}_long_matrix_nan.tsv.gz'
     # Bash command to create cool file
-    cool_command = f"zcat {shlex.quote(output_file_path_nan)} | grep -v start_x | cooler load -f bg2 --count-as-float --assembly hg38 --input-copy-status duplex {shlex.quote(output_bed_file_path)} - {shlex.quote(cool_file_path)}"
+    cool_command = f"zcat {shlex.quote(output_file_path_nan)} | grep -v start_x | cooler load -f bg2 --count-as-float --assembly hg38 --input-copy-status duplex {shlex.quote(args.bed)} - {shlex.quote(cool_file_path)}"
     # Call the Bash command using subprocess
     subprocess.run(cool_command, check=True, shell=True, executable='/bin/bash')
     print(f"cool file has been generated for {data}: {cool_file_path}")    

@@ -47,32 +47,14 @@ chromosome depending on the spread of the data.
 separately (changes which bins are curated wherever the threshold currently goes
 negative); or keep the coupling and document it.
 
-## 3. Pipeline output is written out-of-band
+## 3. hg38 chrom.sizes is downloaded at runtime
 
-All four processes write their real results into `params.output_dir` from inside the
-Python scripts. Only the step 2 pkl is a declared Nextflow output; everything else
-reaches `output_dir` as a side effect, and the declared outputs are log files.
-
-Verified with a stub workflow of the same topology: on `-resume` all tasks cache on
-work-directory state alone. Wiping or editing `output_dir` and resuming therefore
-reports success while producing nothing, or leaves stale results in place.
-
-Related: step 03 reads the pkls from the published `02_permutation_test` directory
-rather than the files Nextflow stages into its work directory, so the dependency is
-expressed only as a cache-busting token and not as real dataflow. Two concurrent runs
-sharing an `output_dir` will also overwrite each other.
-
-**Options:** have each step declare its outputs and consume staged inputs, so `-resume`
-and concurrent runs become correct; or document that `output_dir` must not be touched
-between runs and that `-resume` is unsafe if it is.
-
-## 4. hg38 chrom.sizes is downloaded at runtime
-
-`04_generate_cool_file_permutation_test_results.py` fetches
+`make_genomic_windows.py` fetches
 `https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes` while the
 pipeline runs. There is no offline fallback and no way to point at a local copy, so the
-pipeline needs outbound HTTP from every compute node. The `fcntl.flock` guard that
-serialises the download across parallel chromosome tasks is unreliable over NFS.
+pipeline still needs outbound HTTP. It now happens once, in the `GenomicWindowsBed`
+process, rather than in every chromosome task behind a lock file. Confirmed unreachable
+from the Cologne compute node (SSL error), so this currently blocks step 4 there.
 
 The assembly is hardcoded in three places: the URL, the `autosomes = chr1..chr22` list,
 and `cooler load --assembly hg38`.
