@@ -84,9 +84,12 @@ def _p_values_and_smoothing(perm_results, chrom, bins_rm_f, subset_segtable_hap1
 
 
 def _apply_directionality(filtered_array, key):
-    """Sign the magnitudes in `key`: positive is stronger on hap1, negative on hap2."""
-    mask = filtered_array['directionality'] < 0
-    filtered_array[key][mask] = -np.abs(filtered_array[key][mask])
+    """Sign the magnitudes in `key`: positive is stronger on hap1, negative on hap2.
+    A difference of exactly zero favours neither haplotype, so it carries no magnitude."""
+    direction = filtered_array['directionality']
+    negative = direction < 0
+    filtered_array[key][negative] = -np.abs(filtered_array[key][negative])
+    filtered_array[key][direction == 0] = 0
 
 
 def process_permutation_results(perm_results, chrom, bins_rm_f, gaussian_kernel_size=1):
