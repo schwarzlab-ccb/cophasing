@@ -66,7 +66,11 @@ def curate_segtable_with_mean_WDF_exclude_zeros(segregation_table, high_factor=1
         sigma_WDF = np.nanstd(WDF_values_eval)
         high_threshold = mean_WDF + high_factor * sigma_WDF
         low_threshold = mean_WDF - low_factor * sigma_WDF
-        curated_WDF_index = subset_WDF.query('WDF <= @low_threshold or WDF >= @high_threshold')
+        # Strict comparisons: a window sitting exactly on a threshold is not outside it.
+        # With <= / >= a chromosome whose detected windows all share one WDF has
+        # sigma == 0, so low_threshold == high_threshold == mean and every window matches,
+        # wiping out the detections it was supposed to keep.
+        curated_WDF_index = subset_WDF.query('WDF < @low_threshold or WDF > @high_threshold')
         curated_segtable.loc[curated_WDF_index.index] = 0
         removed_regions_df = pd.concat([removed_regions_df, curated_WDF_index], ignore_index=True)
     curated_segtable.index = segregation_table.index
