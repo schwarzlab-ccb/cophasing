@@ -60,9 +60,20 @@ segregation_table_hap1 = read_segregation_table(Hap="hap1", file_path=curated_di
 segregation_table_hap2 = read_segregation_table(Hap="hap2", file_path=curated_dir, resolution=args.resolution, cutoff=args.cutoff)
 
 subset_segtable_hap1_df = get_region_from_location_string(segregation_table_hap1, args.chr)
+subset_segtable_hap2_df = get_region_from_location_string(segregation_table_hap2, args.chr)
+
+# The test reshuffles samples between the two haplotypes, so both tables have to
+# describe the same bins and the same samples.
+if not subset_segtable_hap1_df.index.equals(subset_segtable_hap2_df.index):
+    raise ValueError(f"hap1 and hap2 cover different bins on {args.chr}")
+if list(subset_segtable_hap1_df.columns) != list(subset_segtable_hap2_df.columns):
+    raise ValueError(
+        f"hap1 and hap2 have different samples: "
+        f"{list(subset_segtable_hap1_df.columns)} vs {list(subset_segtable_hap2_df.columns)}"
+    )
+
 subset_segtable_hap1 = subset_segtable_hap1_df.values
-subset_segtable_hap2 = get_region_from_location_string(segregation_table_hap2, args.chr)
-subset_segtable_hap2 = subset_segtable_hap2.values
+subset_segtable_hap2 = subset_segtable_hap2_df.values
 
 
 """
