@@ -87,5 +87,6 @@ not given; or require a local file and drop the download entirely.
   plus float64 NPMI matrices of ~308 MB; at `num_workers = 10` that reaches tens of GB.
 * `pcp-env.yaml` pins no versions, so a fresh `conda env create` can resolve a different
   toolchain than the one the code was written against.
-* Step 02 relies on `fork` to inherit module-level globals into the worker pool, so it
-  is Linux-only.
+* Step 02 asks for the `fork` start method explicitly, because the worker function reads
+  module-level globals that only a forked child inherits. That pins it to Linux. Making it
+  portable means passing the worker state in explicitly instead of inheriting it.

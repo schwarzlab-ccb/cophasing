@@ -14,7 +14,7 @@ from datetime import datetime
 import pickle # used to save and load data
 import logging
 logging.basicConfig(level=logging.INFO)
-from multiprocessing import Pool # for parallel processing
+from multiprocessing import get_context # for parallel processing
 from pathlib import Path
 
 
@@ -148,61 +148,62 @@ print("\n" + "="*40)
 print("permutation test function defined.")
 
 if __name__ == '__main__':
-    # Create a pool with 10 processes
-    # with Pool(processes=10) as pool:
-    # use the number of workers specified in the command-line arguments to create a pool of processes
-    with Pool(processes=args.num_workers) as pool:
+    # 'fork' is required, not merely convenient: permutation_test_thread reads module-level
+    # state (npmi_diff, subset_segtable_joint, size, args) that only a forked child inherits.
+    # Python 3.14 makes forkserver the default start method on Linux, so ask for fork
+    # explicitly instead of relying on the platform default.
+    with get_context('fork').Pool(processes=args.num_workers) as pool:
         # Map compute_pxy_parallel function across all matrices
         results = pool.map(permutation_test_thread, blocks)
         pool.close()
         pool.join()
-        perm_greater, perm_smaller, perm_equal = zip(*results)
-        
-print("\n" + "="*40)
-print("pool function finished.")
+    perm_greater, perm_smaller, perm_equal = zip(*results)
 
-"""
-sum up results from all blocks
-"""
-perm_greater = np.sum(perm_greater, axis=0)
-perm_smaller = np.sum(perm_smaller, axis=0)
-perm_equal = np.sum(perm_equal, axis=0)
+    print("\n" + "="*40)
+    print("pool function finished.")
 
-print("\n" + "="*40)
-print("permutation test outputs combined.")
+    """
+    sum up results from all blocks
+    """
+    perm_greater = np.sum(perm_greater, axis=0)
+    perm_smaller = np.sum(perm_smaller, axis=0)
+    perm_equal = np.sum(perm_equal, axis=0)
 
-# Store the results in the dictionary
-perm_results = {
-    'npmi_hap1': npmi_hap1,
-    'npmi_hap2': npmi_hap2,
-    'npmi_diff_nan_mask': npmi_diff_nan_mask,
-    'subset_segtable_hap1' : subset_segtable_hap1_df,
-    'perm_greater': perm_greater, 
-    'perm_smaller' : perm_smaller,
-    'perm_equal' : perm_equal
-}
+    print("\n" + "="*40)
+    print("permutation test outputs combined.")
+
+    # Store the results in the dictionary
+    perm_results = {
+        'npmi_hap1': npmi_hap1,
+        'npmi_hap2': npmi_hap2,
+        'npmi_diff_nan_mask': npmi_diff_nan_mask,
+        'subset_segtable_hap1' : subset_segtable_hap1_df,
+        'perm_greater': perm_greater, 
+        'perm_smaller' : perm_smaller,
+        'perm_equal' : perm_equal
+    }
 
 
     
-# 2) Ensure Nextflow-visible deterministic output IN THE WORK DIR:
-out_path = Path(args.out)
+    # 2) Ensure Nextflow-visible deterministic output IN THE WORK DIR:
+    out_path = Path(args.out)
 
-# ensure directory exists
-out_path.parent.mkdir(parents=True, exist_ok=True)
+    # ensure directory exists
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
-# atomic write
-tmp = out_path.with_suffix(out_path.suffix + ".tmp")
-with open(tmp, 'wb') as f:
-    pickle.dump(perm_results, f)
+    # atomic write
+    tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+    with open(tmp, 'wb') as f:
+        pickle.dump(perm_results, f)
 
-os.replace(tmp, out_path)
+    os.replace(tmp, out_path)
 
-print(f"perm_results saved in {out_path}")
-logging.info(f"perm_results saved in {out_path}")
+    print(f"perm_results saved in {out_path}")
+    logging.info(f"perm_results saved in {out_path}")
 
 
-print("="*40 + "\n")
-end = datetime.now()
-duration = end - start
-print(f"End time: {end.strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"Total runtime: {duration}")
+    print("="*40 + "\n")
+    end = datetime.now()
+    duration = end - start
+    print(f"End time: {end.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Total runtime: {duration}")
