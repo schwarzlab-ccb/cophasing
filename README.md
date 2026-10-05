@@ -1,4 +1,4 @@
-# Cophasing (v1.0.0)
+# Cophasing (v1.1.0)
 
 Nextflow-based pipeline for cophasing of GAM reads.
 
