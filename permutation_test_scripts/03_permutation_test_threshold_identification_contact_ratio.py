@@ -8,10 +8,10 @@ import os
 import pandas as pd
 import numpy as np
 import argparse # to parse command-line arguments
-import glob # used to autocomplete filenames
 from kneed import KneeLocator # to find the knee point in a curve 
 from pathlib import Path
 import logging
+logging.basicConfig(level=logging.INFO)
 
 
 """

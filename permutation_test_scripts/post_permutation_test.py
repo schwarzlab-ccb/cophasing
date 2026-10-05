@@ -5,7 +5,6 @@ Code by Claudia Robens
 import numpy as np
 import pandas as pd
 import pickle # used to save and load data
-import scipy as sp
 import glob # used to autocomplete filenames
 import os
 import copy
@@ -35,8 +34,8 @@ def find_and_load_pkl(directory_path, chrom):
 def gaussian_filter_nan(arr, sigma=1, truncate=4.0, eps=1e-6):
     mask = np.isfinite(arr)
     arr_filled = np.where(mask, arr, 0.0)
-    arr_filtered = sp.ndimage.gaussian_filter(arr_filled, sigma=sigma, truncate=truncate)
-    mask_filtered = sp.ndimage.gaussian_filter(mask.astype(float), sigma=sigma, truncate=truncate)
+    arr_filtered = gaussian_filter(arr_filled, sigma=sigma, truncate=truncate)
+    mask_filtered = gaussian_filter(mask.astype(float), sigma=sigma, truncate=truncate)
     
     result = np.full_like(arr, np.nan)
     safe = (mask_filtered > eps) & np.isfinite(mask_filtered) & np.isfinite(arr_filtered)

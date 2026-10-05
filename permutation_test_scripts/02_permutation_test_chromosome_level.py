@@ -5,16 +5,15 @@ Code by Claudia Robens
 """
 load modules
 """
-from generate_npmi import coordinates_from_location_string, get_region_from_location_string, calculate_NPMI, calculate_NPMI_steps, get_ticks, get_npmi_scale, read_segregation_table
+from generate_npmi import get_region_from_location_string, calculate_NPMI_steps, read_segregation_table
 
 import os
-import pandas as pd
 import numpy as np
 import argparse # to parse command-line arguments
 from datetime import datetime
-import glob # used to autocomplete filenames
 import pickle # used to save and load data
 import logging
+logging.basicConfig(level=logging.INFO)
 from multiprocessing import Pool # for parallel processing
 from pathlib import Path
 
