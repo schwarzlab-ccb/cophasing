@@ -1,0 +1,233 @@
+"""
+SCRIPT TO GENERATE COOL FILE OF NPMI MATRICES TO PLOT IN PYGENOMETRACKS
+Script to keep NaN values in the output.
+Code by Claudia Robens
+"""
+
+import logging
+logging.basicConfig(level=logging.INFO)  # Set the logging level as needed
+logging.info("Script started.")
+
+
+"""
+Imports
+"""
+from post_permutation_test import find_and_load_pkl, process_permutation_results_thresh
+from generate_npmi import get_region_from_location_string, calculate_NPMI_steps, read_segregation_table
+
+
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import gzip
+import subprocess
+import shlex
+import os
+import argparse
+
+
+logging.info("imports done.")
+print("\n")
+
+
+# define args
+"""
+Command-line arguments
+"""
+parser = argparse.ArgumentParser()
+parser.add_argument('--chr', type=str, required=True, help='chr number')
+parser.add_argument('--output_dir', type=str, required=True,
+                    help='Base output directory containing all pipeline subdirectories')
+parser.add_argument('--cutoff', type=str, required=True,
+                    help='The cutoff value which was used for Co-Phasing pipeline, e.g. "10Mb"')
+parser.add_argument('--resolution', type=int, required=True,
+                    help='The resolution which was used for Co-Phasing pipeline, e.g. 40000')
+parser.add_argument('--gaussian_kernel_size', type=int, required=True,
+                    help='Kernel size used for Gaussian filter')
+parser.add_argument('--bed', type=str, required=True,
+                    help='BED of genomic windows that the cool files are binned on')
+parser.add_argument('--pseudocount', type=int, default=0,
+                    help='Pseudocount used when calculating NPMI; must match the value used in step 02, default 0')
+
+args = parser.parse_args()
+logging.info("args done.")
+
+curated_dir = str(Path(args.output_dir) / '01_curated_segregation_tables')
+permutation_test_dir = str(Path(args.output_dir) / '02_permutation_test')
+bins_rm_file = str(Path(args.output_dir) / '01_curated_segregation_tables' / 'bins_rm_hap1_hap2.tsv')
+thresh_ident = str(Path(args.output_dir) / '03_thresholds' / 'knee_point_table_threshold_steps.tsv')
+
+
+# Print arguments to stdout
+print("\n" + "="*40)
+print("Arguments applied:")
+for arg, value in vars(args).items():
+    print(f"{arg}: {value}")
+print("="*40 + "\n")
+
+
+segregation_table_hap1 = read_segregation_table(Hap="hap1", file_path=curated_dir,
+                                                 resolution=args.resolution, cutoff=args.cutoff)
+segregation_table_hap2 = read_segregation_table(Hap="hap2", file_path=curated_dir,
+                                                 resolution=args.resolution, cutoff=args.cutoff)
+segregation_table_both = read_segregation_table(Hap="both", file_path=curated_dir,
+                                                 resolution=args.resolution, cutoff=args.cutoff)
+
+"""
+calcualte NPMI matrices
+"""
+subset_segtable_hap1 = get_region_from_location_string (segregation_table_hap1, args.chr)
+subset_segtable_hap2 = get_region_from_location_string (segregation_table_hap2, args.chr)
+subset_segtable_both = get_region_from_location_string (segregation_table_both, args.chr)
+
+# Same estimator and pseudocount as step 02, otherwise the matrices shipped in the
+# cool files are not the ones the permutation test was run on.
+npmi_matrix_hap1 = calculate_NPMI_steps (subset_segtable_hap1.values, pseudocount = args.pseudocount)
+npmi_matrix_hap2 = calculate_NPMI_steps (subset_segtable_hap2.values, pseudocount = args.pseudocount)
+npmi_matrix_both = calculate_NPMI_steps (subset_segtable_both.values, pseudocount = args.pseudocount)
+
+print("="*40 + "\n")
+
+
+"""
+Read in permutation results
+"""
+
+
+perm_results = find_and_load_pkl(directory_path=permutation_test_dir, chrom=args.chr)
+filtered_array = process_permutation_results_thresh(perm_results=perm_results, chrom=args.chr,
+                                                     thresh_table=thresh_ident, bins_rm_f=bins_rm_file,
+                                                     subset_segtable_hap1=subset_segtable_hap1,
+                                                     gaussian_kernel_size=args.gaussian_kernel_size)
+
+
+p_value_npmi_2sided_updated = filtered_array['p_value_npmi_2sided_updated']
+p_value_log_filter_npmi = filtered_array['p_value_log_filter_npmi']
+p_value_log_filter_thresh_npmi = filtered_array['p_value_log_filter_thresh_npmi']
+p_value_log_filter_thresh_npmi_directionality = filtered_array['p_value_log_filter_thresh_npmi_directionality']
+
+
+"""remove bins in NPMI (unphased and phased) based on WDF curation"""
+bins_rm = pd.read_csv(bins_rm_file, sep='\t', index_col=0)
+bins_rm_filtered = bins_rm[bins_rm['chrom'] == args.chr]
+tbr = subset_segtable_hap1.index.get_level_values('start').isin(bins_rm_filtered['start'])  # to be removed
+
+
+# Set columns and rows to NaN which are identified in WDF curation step
+npmi_matrix_hap1[:, np.array(tbr)] = np.nan  # set columns to NaN
+npmi_matrix_hap1[np.array(tbr), :] = np.nan  # set rows to NaN
+
+npmi_matrix_hap2[:, np.array(tbr)] = np.nan  # set columns to NaN
+npmi_matrix_hap2[np.array(tbr), :] = np.nan  # set rows to NaN
+
+npmi_matrix_both[:, np.array(tbr)] = np.nan  # set columns to NaN
+npmi_matrix_both[np.array(tbr), :] = np.nan  # set rows to NaN
+
+"""
+Generate dataframe with 'chr:start-end' information as rownames and column names
+"""
+# Bin labels are taken from the segregation table index rather than rebuilt from
+# the resolution: the last window of a chromosome is truncated at the chromosome
+# end, so start + resolution is wrong for it and the bin would not match the BED.
+bin_labels = np.array([
+    f'{args.chr}:{start}-{stop}'
+    for start, stop in zip(subset_segtable_hap1.index.get_level_values('start'),
+                           subset_segtable_hap1.index.get_level_values('stop'))
+])
+
+
+def add_chr_column(array, labels=bin_labels):
+    if array.shape != (len(labels), len(labels)):
+        raise ValueError(f"matrix is {array.shape}, but {args.chr} has {len(labels)} bins")
+    return pd.DataFrame(data=array, columns=labels, index=labels)
+
+
+def create_long_matrix(df):
+    # Resetting the index to include row names as a regular column
+    dataframe_reset = df.reset_index()
+
+    # Melt the DataFrame to long format
+    long_matrix = pd.melt(dataframe_reset, id_vars=['index'], var_name='Column', value_name='value')
+
+    # Rename the columns
+    long_matrix.columns = ['Row', 'Column', 'value']
+    # Split 'Row' and 'Column' columns
+    long_matrix[['chrom_x', 'start_x', 'end_x']] = long_matrix['Row'].str.split('[:-]', expand=True)
+    long_matrix[['chrom_y', 'start_y', 'end_y']] = long_matrix['Column'].str.split('[:-]', expand=True)
+
+
+    # Convert start1, end1, start2, end2 to numeric
+    long_matrix[['start_x', 'end_x', 'start_y', 'end_y']] = long_matrix[['start_x', 'end_x', 'start_y', 'end_y']].apply(pd.to_numeric)
+
+    # Reorder the columns
+    long_matrix = long_matrix[['chrom_x', 'start_x', 'end_x', 'chrom_y', 'start_y', 'end_y', 'value']]
+
+    return long_matrix
+
+"""
+specify directory path to save the output files
+and create it if it does not exist
+"""
+
+directory_path = str(Path(args.output_dir) / '04_cool_files' / f'cool_files_npmi_permutation_test_{args.chr}') + '/'
+os.makedirs(directory_path, exist_ok=True)
+os.makedirs(str(Path(args.output_dir) / '04_cool_files'), exist_ok=True)
+
+print("\n" + "="*40)
+
+
+def save_long_matrix_nan(chr, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path):
+    npmi_matrix_df = add_chr_column(data_matrix)
+    long_matrix = create_long_matrix(npmi_matrix_df)
+
+    output_file_path_long_mat = f'{directory_path}permutation_test_results_{data}_{chr}_long_matrix_nan.tsv.gz'
+
+    with gzip.open(output_file_path_long_mat, 'wt', encoding='utf-8') as f:
+        long_matrix.to_csv(f, sep='\t', index=False)
+
+    print(f"Output {data} saved to {output_file_path_long_mat}")
+
+# p_value_log_filter_npmi
+save_long_matrix_nan(chr=args.chr, data='p_value_log_filter_npmi', data_matrix=p_value_log_filter_npmi, directory_path=directory_path)
+# p_value_log_filter_thresh_npmi
+save_long_matrix_nan(chr=args.chr, data='p_value_log_filter_thresh_npmi', data_matrix=p_value_log_filter_thresh_npmi, directory_path=directory_path)
+# p_value_log_filter_thresh_npmi_directionality
+save_long_matrix_nan(chr=args.chr, data='p_value_log_filter_thresh_npmi_directionality', data_matrix=p_value_log_filter_thresh_npmi_directionality, directory_path=directory_path)
+# p_value_npmi_2sided_updated
+save_long_matrix_nan(chr=args.chr, data='p_value_npmi_2sided_updated', data_matrix=p_value_npmi_2sided_updated, directory_path=directory_path)
+# npmi_matrix_hap1
+save_long_matrix_nan(chr=args.chr, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path)
+# npmi_matrix_hap2
+save_long_matrix_nan(chr=args.chr, data='npmi_matrix_hap2', data_matrix=npmi_matrix_hap2, directory_path=directory_path)
+# npmi_matrix_both
+save_long_matrix_nan(chr=args.chr, data='npmi_matrix_both', data_matrix=npmi_matrix_both, directory_path=directory_path)
+print("="*40 + "\n")
+# #############
+
+
+"""
+generate cool format file
+"""
+def create_cool_file(data='npmi_matrix_hap1'):
+    cool_file_path = f'{directory_path}permutation_test_results_{data}_{args.chr}_nan.cool'
+    output_file_path_nan = f'{directory_path}permutation_test_results_{data}_{args.chr}_long_matrix_nan.tsv.gz'
+    # Bash command to create cool file
+    cool_command = f"zcat {shlex.quote(output_file_path_nan)} | grep -v start_x | cooler load -f bg2 --count-as-float --assembly hg38 --input-copy-status duplex {shlex.quote(args.bed)} - {shlex.quote(cool_file_path)}"
+    # Call the Bash command using subprocess
+    subprocess.run(cool_command, check=True, shell=True, executable='/bin/bash')
+    print(f"cool file has been generated for {data}: {cool_file_path}")    
+
+# p_value_log_filter_npmi
+create_cool_file(data='p_value_log_filter_npmi')
+# p_value_log_filter_thresh_npmi
+create_cool_file(data='p_value_log_filter_thresh_npmi')
+# p_value_log_filter_thresh_npmi_directionality
+create_cool_file(data='p_value_log_filter_thresh_npmi_directionality')
+# p_value_npmi_2sided_updated
+create_cool_file(data='p_value_npmi_2sided_updated')
+# npmi_matrix_hap1
+create_cool_file(data='npmi_matrix_hap1')
+# npmi_matrix_hap2
+create_cool_file(data='npmi_matrix_hap2')
+# npmi_matrix_both
+create_cool_file(data='npmi_matrix_both')
