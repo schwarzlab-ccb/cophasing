@@ -128,14 +128,23 @@ def read_segregation_table(Hap, file_path, cutoff, resolution):
         segregation_table: pandas DataFrame with the segregation table.
 
     """
-    filename_beginning = f"{file_path}/*.{str(resolution)}.{str(Hap)}.segregation"
-    matching_files = glob.glob(f"{filename_beginning}*")
+    # Prefer tables whose name carries the cutoff; fall back to any table at this
+    # resolution so output of a run that does not encode the cutoff still works.
+    pattern = f"{file_path}/*_{str(cutoff)}_cutoff.{str(resolution)}.{str(Hap)}.segregation*"
+    matching_files = sorted(glob.glob(pattern))
+    if not matching_files:
+        pattern = f"{file_path}/*.{str(resolution)}.{str(Hap)}.segregation*"
+        matching_files = sorted(glob.glob(pattern))
+    if len(matching_files) > 1:
+        raise ValueError(
+            f"{Hap}: {len(matching_files)} segregation tables match '{pattern}', "
+            f"cannot choose between them: {matching_files}"
+        )
     if matching_files:
-        # If there is, use the first one
         hap = matching_files[0]
-        print(f"{str(Hap)} segregation table: '{matching_files[0]}'")
+        print(f"{str(Hap)} segregation table: '{hap}'")
         segregation_table = pd.read_csv(hap, sep='\t', index_col=[0, 1, 2])
         return segregation_table
     else:
         # If there isn't, print an error message
-        print(f"No file found that starts with '{filename_beginning}'")
+        print(f"No file found that starts with '{pattern}'")
