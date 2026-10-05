@@ -118,7 +118,7 @@ def get_npmi_scale (matrix):
 def read_segregation_table(Hap, file_path, cutoff, resolution):
     """
     Reads the segregation table for the specified haplotype and returns it as a pandas DataFrame.
-    If the file is not found, prints an error message and returns None.
+    Raises FileNotFoundError if no table matches, ValueError if several do.
     Args:
         Hap: 'hap1', 'hap2', or 'both'. Defines the haplotype for which the segregation table should be read.
         file_path: The path to the directory containing the segregation table files.
@@ -140,11 +140,9 @@ def read_segregation_table(Hap, file_path, cutoff, resolution):
             f"{Hap}: {len(matching_files)} segregation tables match '{pattern}', "
             f"cannot choose between them: {matching_files}"
         )
-    if matching_files:
-        hap = matching_files[0]
-        print(f"{str(Hap)} segregation table: '{hap}'")
-        segregation_table = pd.read_csv(hap, sep='\t', index_col=[0, 1, 2])
-        return segregation_table
-    else:
-        # If there isn't, print an error message
-        print(f"No file found that starts with '{pattern}'")
+    if not matching_files:
+        raise FileNotFoundError(f"{Hap}: no segregation table matches '{pattern}'")
+    hap = matching_files[0]
+    print(f"{str(Hap)} segregation table: '{hap}'")
+    segregation_table = pd.read_csv(hap, sep='\t', index_col=[0, 1, 2])
+    return segregation_table
