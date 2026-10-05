@@ -22,28 +22,26 @@ def coordinates_from_location_string (region):
 def get_region_from_location_string (segregation_table, region):
     """
     Note: Code by Alexander Kukalev
+
+    Adapted during review: bins are selected by actual overlap with the requested region,
+    and the range check compares the requested stop against the chromosome end instead of
+    the start of its last bin — the latter rejected every region reaching the final,
+    truncated bin of a chromosome.
     """
     if len (segregation_table.index.names) == 1: # Check if supplied segregation table has multiindex
-        segregation_table.set_index(['chrom','start','stop'], inplace = True) 
+        segregation_table.set_index(['chrom','start','stop'], inplace = True)
     chrom, start, stop = coordinates_from_location_string (region)
     seg_chrome = segregation_table.loc [chrom] # Subset for chromosome
     if start=='' and stop =='':
         return seg_chrome
-    else:
-        start_values = np.array (seg_chrome.index.get_level_values('start'))
-        step = start_values [1] - start_values [0] # Find the resolution from table 
-        closest_start_value = start_values[np.abs(start_values-start).argmin()]# Find start coordinate closest to start of the region
-        if start < closest_start_value: # Make sure region start is included in the subset
-            closest_start_value = closest_start_value - step
-        stop_values = np.array (seg_chrome.index.get_level_values('stop'))
-        closest_stop_value = stop_values[np.abs(stop_values-stop).argmin()]# Find stop coordinate closest to end of the region
-        if stop > closest_stop_value: # Make sure region stop is included in the subset
-            closest_stop_value = closest_stop_value + step
-        start_values = np.array (seg_chrome.index.get_level_values('start'))
-        last_bin_of_the_chromosome = np.max (start_values)
-        if closest_stop_value > last_bin_of_the_chromosome:
-            raise Exception ('Check coordinates of your region! The chromosome is shorter than specified range')
-        return seg_chrome.loc [closest_start_value:closest_stop_value-step]
+    start_values = np.array (seg_chrome.index.get_level_values('start'))
+    stop_values = np.array (seg_chrome.index.get_level_values('stop'))
+    if stop > np.max (stop_values):
+        raise Exception ('Check coordinates of your region! The chromosome is shorter than specified range')
+    overlapping = (stop_values > start) & (start_values < stop) # Every bin touching the region
+    if not overlapping.any():
+        raise Exception ('Check coordinates of your region! No bins overlap the requested range')
+    return seg_chrome [overlapping]
 
 def calculate_NPMI (segregation_table, region):
     """    
