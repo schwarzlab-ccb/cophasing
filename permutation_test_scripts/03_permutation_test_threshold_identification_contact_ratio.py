@@ -48,6 +48,14 @@ read in table with bins to be removed based on WDF curation
 
 chromosomes = args.chromosomes.split(',')
 
+THRESHOLD_STEP_SIZE = 0.05
+# Leading points to drop before the knee search: the start of the curve is
+# near-vertical and would always win. Defined per step size, as it was tuned by eye.
+KNEE_SEARCH_SKIP = {0.1: 1, 0.05: 3}
+if THRESHOLD_STEP_SIZE not in KNEE_SEARCH_SKIP:
+    raise ValueError(f"no knee search offset defined for step size {THRESHOLD_STEP_SIZE}")
+knee_search_skip = KNEE_SEARCH_SKIP[THRESHOLD_STEP_SIZE]
+
 # Dictionary to store ratios for each chromosome
 ratios_dict = {}
 knee_points = {}
@@ -77,34 +85,36 @@ for chrom in chromosomes:
     p_value_log_filter_npmi_directionality_masked_values_wo_nan = p_value_log_filter_npmi_directionality_masked_values[~np.isnan(p_value_log_filter_npmi_directionality_masked_values)]
 
     # Calculate thresholds and ratios
-    threshold_step_size = 0.05
-    thresholds = np.arange(0, np.nanmax(np.abs(filtered_array['p_value_log_filter_npmi_directionality'].flatten())), threshold_step_size)
+    total_non_nan = len(p_value_log_filter_npmi_directionality_masked_values_wo_nan)
+    if total_non_nan == 0:
+        logging.warning(f"{chrom}: every contact is masked, no threshold can be determined.")
+        ratios_dict[chrom] = []
+        knee_points[chrom] = None
+        continue
+
+    thresholds = np.arange(0, np.nanmax(np.abs(filtered_array['p_value_log_filter_npmi_directionality'].flatten())), THRESHOLD_STEP_SIZE)
     ratios = []
     for threshold in thresholds:
         # WITHOUT NAN AS TOTAL
         count_above_threshold = np.sum(np.abs(p_value_log_filter_npmi_directionality_masked_values_wo_nan) > threshold)
-        total_non_nan = len(p_value_log_filter_npmi_directionality_masked_values_wo_nan)
         ratio_above_threshold = count_above_threshold / total_non_nan
         ratios.append(ratio_above_threshold)
 
-
     # Store the ratios for the current chromosome
     ratios_dict[chrom] = ratios
-    if threshold_step_size == 0.1:
-        # Use KneeLocator to find the elbow point
-        # without nan values
-        knee = KneeLocator(thresholds[1:], ratios[1:], curve='convex', direction='decreasing')
-        knee_points[chrom] = knee.knee
-        if knee.knee is None:
-            logging.warning(f"{chrom}: KneeLocator returned None (flat or monotonic ratio curve). "
-                            "Threshold will be NaN — downstream no differential contacts will be identified.")
-    elif threshold_step_size == 0.05:
-        knee = KneeLocator(thresholds[3:], ratios[3:], curve='convex', direction='decreasing')
-        knee_points[chrom] = knee.knee
-        if knee.knee is None:
-            logging.warning(f"{chrom}: KneeLocator returned None (flat or monotonic ratio curve). "
-                            "Threshold will be NaN — downstream no differential contacts will be identified.")
-   
+    if len(thresholds) - knee_search_skip < 2:
+        logging.warning(f"{chrom}: only {len(thresholds)} threshold steps, too few for a knee search. "
+                        "Threshold will be NaN — downstream no differential contacts will be identified.")
+        knee_points[chrom] = None
+        continue
+
+    knee = KneeLocator(thresholds[knee_search_skip:], ratios[knee_search_skip:],
+                       curve='convex', direction='decreasing')
+    knee_points[chrom] = knee.knee
+    if knee.knee is None:
+        logging.warning(f"{chrom}: KneeLocator returned None (flat or monotonic ratio curve). "
+                        "Threshold will be NaN — downstream no differential contacts will be identified.")
+
 
 """
 WITHOUT NAN AS TOTAL
@@ -122,7 +132,7 @@ for chrom in ratios_dict:
 ratios_df = pd.DataFrame(ratios_dict)
 
 # add indices 0 to max_length*0.1
-ratios_df.index = np.arange(0, max_length*threshold_step_size, threshold_step_size)
+ratios_df.index = np.arange(0, max_length*THRESHOLD_STEP_SIZE, THRESHOLD_STEP_SIZE)
 
 # Save the DataFrame to TSV files
 threshold_ratio_total_wo_nan_output_dir = threshold_output_dir + '/'
