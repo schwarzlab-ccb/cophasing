@@ -47,86 +47,76 @@ def gaussian_filter_nan(arr, sigma=1, truncate=4.0, eps=1e-6):
     return result_sym
 
 
-def process_permutation_results(perm_results, chrom, bins_rm_f, gaussian_kernel_size=1 ):
+def _p_values_and_smoothing(perm_results, chrom, bins_rm_f, subset_segtable_hap1, gaussian_kernel_size):
+    """Shared part of both entry points: two-sided p-values, WDF masking, log transform,
+    Gaussian smoothing and the hap1-hap2 directionality."""
     # Read the bins to be removed
-    bins_rm = pd.read_csv(bins_rm_f, sep='\t', index_col = 0)
+    bins_rm = pd.read_csv(bins_rm_f, sep='\t', index_col=0)
     bins_rm_filtered = bins_rm[bins_rm['chrom'] == chrom]
-    tbr = perm_results['subset_segtable_hap1'].index.get_level_values('start').isin(bins_rm_filtered['start'])  # to be removed
+    tbr = subset_segtable_hap1.index.get_level_values('start').isin(bins_rm_filtered['start'])  # to be removed
+
+    # Work on a copy so the caller's perm_results is left alone
+    filtered_array = copy.deepcopy(perm_results)
+    greater = filtered_array['perm_greater']
+    smaller = filtered_array['perm_smaller']
+    equal = filtered_array['perm_equal']
 
     # CALCULATE UPDATED P-VALUE WITH CORRECTION
-    perm_results['p_value_npmi_2sided_updated'] = np.minimum(1,2*np.minimum(((perm_results['perm_greater']+perm_results['perm_equal']+1 ) / (perm_results['perm_greater']+perm_results['perm_smaller']+perm_results['perm_equal']+1)), ((perm_results['perm_smaller']+perm_results['perm_equal']+1 ) / (perm_results['perm_greater']+perm_results['perm_smaller']+perm_results['perm_equal']+1))))
+    total = greater + smaller + equal + 1
+    filtered_array['p_value_npmi_2sided_updated'] = np.minimum(
+        1, 2 * np.minimum((greater + equal + 1) / total, (smaller + equal + 1) / total))
 
-    # mask perm_results['p_value_npmi_2sided'] with nan mask of perm_results['npmi_diff_nan_mask']
-    filtered_array = copy.deepcopy(perm_results)
+    # mask the p-values with the nan mask of the original difference matrix
     filtered_array['p_value_npmi_2sided_updated'][filtered_array['npmi_diff_nan_mask']] = np.nan
-    
-    
+
     # mask p-value matrix based on WDF curation
     filtered_array['p_value_npmi_2sided_updated'][:, np.array(tbr)] = np.nan  # set columns to NaN
-    filtered_array['p_value_npmi_2sided_updated'][np.array(tbr), :] = np.nan 
-    
-    #log transformation of p-values
+    filtered_array['p_value_npmi_2sided_updated'][np.array(tbr), :] = np.nan
+
+    # log transformation of p-values
     filtered_array['p_value_log_npmi'] = -np.log10(filtered_array['p_value_npmi_2sided_updated'])
 
-    # filtering using Gaussian filter
-    filtered_array['p_value_log_filter_npmi'] = gaussian_filter_nan(filtered_array['p_value_log_npmi'], sigma = gaussian_kernel_size)
-    
-    # add directionality of the contacts by using 'perm_greater' and 'perm_smaller' stored in perm_results
-    filtered_array['greater_mask'] = filtered_array['perm_greater'] < filtered_array['perm_smaller'] # stronger contact on hap1
-    filtered_array['smaller_mask'] = filtered_array['perm_smaller'] < filtered_array['perm_greater'] # stronger contact on hap2
-    
-    filtered_array['directionality'] = filtered_array['npmi_hap1'] - filtered_array['npmi_hap2'] # stronger contact on hap2
-    directionality_mask = filtered_array['directionality'] < 0
+    # smoothing using Gaussian filter
+    filtered_array['p_value_log_filter_npmi'] = gaussian_filter_nan(
+        filtered_array['p_value_log_npmi'], sigma=gaussian_kernel_size)
 
-    filtered_array['p_value_log_filter_npmi_directionality'] = copy.deepcopy(filtered_array['p_value_log_filter_npmi'])
-    filtered_array["p_value_log_filter_npmi_directionality"][directionality_mask] = -np.abs(filtered_array["p_value_log_filter_npmi_directionality"][directionality_mask]) # positive values stronger on hap1, negative stronger on hap2
-
+    filtered_array['directionality'] = filtered_array['npmi_hap1'] - filtered_array['npmi_hap2']
     return filtered_array
 
-def process_permutation_results_thresh(perm_results, chrom, thresh_table, bins_rm_f,subset_segtable_hap1, gaussian_kernel_size=1):
-    # Read the bins to be removed
-    bins_rm = pd.read_csv(bins_rm_f, sep='\t', index_col = 0)
-    bins_rm_filtered = bins_rm[bins_rm['chrom'] == chrom]
-    tbr = subset_segtable_hap1.index.get_level_values('start').isin(bins_rm_filtered['start'])  # to be removed # cannot use the subset_segtable_hap1 here, because it is only a matrix without indices in the perm_results
 
-    # CALCULATE UPDATED P-VALUE WITH CORRECTION
-    perm_results['p_value_npmi_2sided_updated'] = np.minimum(1,2*np.minimum(((perm_results['perm_greater']+perm_results['perm_equal']+1 ) / (perm_results['perm_greater']+perm_results['perm_smaller']+perm_results['perm_equal']+1)), ((perm_results['perm_smaller']+perm_results['perm_equal']+1 ) / (perm_results['perm_greater']+perm_results['perm_smaller']+perm_results['perm_equal']+1))))
-    # mask perm_results['p_value_npmi_2sided'] with nan mask of perm_results['npmi_diff_nan_mask']
-    filtered_array = copy.deepcopy(perm_results)
-    filtered_array['p_value_npmi_2sided_updated'][filtered_array['npmi_diff_nan_mask']] = np.nan
-    
-    
-    # mask p-value matrix based on WDF curation
-    filtered_array['p_value_npmi_2sided_updated'][:, np.array(tbr)] = np.nan  # set columns to NaN
-    filtered_array['p_value_npmi_2sided_updated'][np.array(tbr), :] = np.nan 
-    
-    #log transformation of p-values
-    filtered_array['p_value_log_npmi'] = -np.log10(filtered_array['p_value_npmi_2sided_updated'])
-    
-    # smoothing using Gaussian filter
-    filtered_array['p_value_log_filter_npmi'] = gaussian_filter_nan(filtered_array['p_value_log_npmi'], sigma = gaussian_kernel_size)
-    
-    # filtering based on thresholded
-    filtered_array['p_value_log_filter_thresh_npmi'] = copy.deepcopy(filtered_array['p_value_log_filter_npmi'])
-    
+def _apply_directionality(filtered_array, key):
+    """Sign the magnitudes in `key`: positive is stronger on hap1, negative on hap2."""
+    mask = filtered_array['directionality'] < 0
+    filtered_array[key][mask] = -np.abs(filtered_array[key][mask])
+
+
+def process_permutation_results(perm_results, chrom, bins_rm_f, gaussian_kernel_size=1):
+    filtered_array = _p_values_and_smoothing(
+        perm_results, chrom, bins_rm_f, perm_results['subset_segtable_hap1'], gaussian_kernel_size)
+
+    filtered_array['p_value_log_filter_npmi_directionality'] = copy.deepcopy(
+        filtered_array['p_value_log_filter_npmi'])
+    _apply_directionality(filtered_array, 'p_value_log_filter_npmi_directionality')
+    return filtered_array
+
+
+def process_permutation_results_thresh(perm_results, chrom, thresh_table, bins_rm_f,
+                                       subset_segtable_hap1, gaussian_kernel_size=1):
+    # subset_segtable_hap1 is passed in because perm_results only carries the matrix
+    filtered_array = _p_values_and_smoothing(
+        perm_results, chrom, bins_rm_f, subset_segtable_hap1, gaussian_kernel_size)
+
     # include thresholding step based on knee point from threshold table
-    threshold_df = pd.read_csv(thresh_table, sep = "\t")
-    threshold_df = threshold_df.set_index('chromosome')
+    threshold_df = pd.read_csv(thresh_table, sep="\t").set_index('chromosome')
     threshold = threshold_df.loc[chrom, 'knee']
-    message = f"Threshold for {chrom}: {threshold}"
-    print(message)
-    filtered_array['p_value_log_filter_thresh_npmi'][filtered_array['p_value_log_filter_thresh_npmi'] < threshold] = 0
+    print(f"Threshold for {chrom}: {threshold}")
 
+    filtered_array['p_value_log_filter_thresh_npmi'] = copy.deepcopy(
+        filtered_array['p_value_log_filter_npmi'])
+    below = filtered_array['p_value_log_filter_thresh_npmi'] < threshold
+    filtered_array['p_value_log_filter_thresh_npmi'][below] = 0
 
-    # add directionality of the contacts by using 'perm_greater' and 'perm_smaller' stored in perm_results
-    filtered_array['greater_mask'] = filtered_array['perm_greater'] < filtered_array['perm_smaller'] # stronger contact on hap1
-    filtered_array['smaller_mask'] = filtered_array['perm_smaller'] < filtered_array['perm_greater'] # stronger contact on hap2
-    
-    filtered_array['directionality'] = filtered_array['npmi_hap1'] - filtered_array['npmi_hap2'] # stronger contact on hap2
-    directionality_mask = filtered_array['directionality'] < 0
-
-    # copy p_value_log_filter_thresh_npmi and create a new level were the directionality is stored 
-    filtered_array['p_value_log_filter_thresh_npmi_directionality'] = copy.deepcopy(filtered_array['p_value_log_filter_thresh_npmi'])
-    filtered_array["p_value_log_filter_thresh_npmi_directionality"][directionality_mask] = -np.abs(filtered_array["p_value_log_filter_thresh_npmi_directionality"][directionality_mask]) # positive values stronger on hap1, negative stronger on hap2
-
+    filtered_array['p_value_log_filter_thresh_npmi_directionality'] = copy.deepcopy(
+        filtered_array['p_value_log_filter_thresh_npmi'])
+    _apply_directionality(filtered_array, 'p_value_log_filter_thresh_npmi_directionality')
     return filtered_array
