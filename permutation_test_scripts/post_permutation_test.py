@@ -115,8 +115,14 @@ def process_permutation_results_thresh(perm_results, chrom, thresh_table, bins_r
 
     filtered_array['p_value_log_filter_thresh_npmi'] = copy.deepcopy(
         filtered_array['p_value_log_filter_npmi'])
-    below = filtered_array['p_value_log_filter_thresh_npmi'] < threshold
-    filtered_array['p_value_log_filter_thresh_npmi'][below] = 0
+    thresholded = filtered_array['p_value_log_filter_thresh_npmi']
+    if pd.isna(threshold):
+        # `value < NaN` is false everywhere, so comparing against a missing knee would
+        # let every contact through as significant. No threshold means no calls.
+        print(f"No threshold for {chrom}: reporting no differential contacts")
+        thresholded[~np.isnan(thresholded)] = 0
+    else:
+        thresholded[thresholded < threshold] = 0
 
     filtered_array['p_value_log_filter_thresh_npmi_directionality'] = copy.deepcopy(
         filtered_array['p_value_log_filter_thresh_npmi'])
