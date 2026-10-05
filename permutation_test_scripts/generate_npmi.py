@@ -128,7 +128,7 @@ def read_segregation_table(Hap, file_path, cutoff, resolution):
         segregation_table: pandas DataFrame with the segregation table.
 
     """
-filename_beginning = f"{file_path}/*.{str(resolution)}.{str(Hap)}.segregation"
+    filename_beginning = f"{file_path}/*.{str(resolution)}.{str(Hap)}.segregation"
     matching_files = glob.glob(f"{filename_beginning}*")
     if matching_files:
         # If there is, use the first one
