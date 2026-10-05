@@ -85,6 +85,7 @@ process GenerateCoolFromPerm {
         --cutoff ${params.cutoff} \\
         --resolution ${params.resolution} \\
         --gaussian_kernel_size ${params.gaussian_kernel_size} \\
+        --pseudocount ${params.pseudocount} \\
         > 04_cool_file_${chr}.log 2>&1
     """
 }

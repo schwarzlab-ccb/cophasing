@@ -13,7 +13,7 @@ logging.info("Script started.")
 Imports
 """
 from post_permutation_test import find_and_load_pkl, process_permutation_results_thresh
-from generate_npmi import get_region_from_location_string, calculate_NPMI, read_segregation_table
+from generate_npmi import get_region_from_location_string, calculate_NPMI_steps, read_segregation_table
 
 
 import pandas as pd
@@ -46,6 +46,8 @@ parser.add_argument('--resolution', type=int, required=True,
                     help='The resolution which was used for Co-Phasing pipeline, e.g. 40000')
 parser.add_argument('--gaussian_kernel_size', type=int, required=True,
                     help='Kernel size used for Gaussian filter')
+parser.add_argument('--pseudocount', type=int, default=0,
+                    help='Pseudocount used when calculating NPMI; must match the value used in step 02, default 0')
 
 args = parser.parse_args()
 logging.info("args done.")
@@ -74,14 +76,15 @@ segregation_table_both = read_segregation_table(Hap="both", file_path=curated_di
 """
 calcualte NPMI matrices
 """
-# Hap1
-npmi_matrix_hap1 = calculate_NPMI (segregation_table_hap1, args.chr)
-# Hap2
-npmi_matrix_hap2 = calculate_NPMI (segregation_table_hap2, args.chr)
-# Both
-npmi_matrix_both = calculate_NPMI (segregation_table_both, args.chr)
-
 subset_segtable_hap1 = get_region_from_location_string (segregation_table_hap1, args.chr)
+subset_segtable_hap2 = get_region_from_location_string (segregation_table_hap2, args.chr)
+subset_segtable_both = get_region_from_location_string (segregation_table_both, args.chr)
+
+# Same estimator and pseudocount as step 02, otherwise the matrices shipped in the
+# cool files are not the ones the permutation test was run on.
+npmi_matrix_hap1 = calculate_NPMI_steps (subset_segtable_hap1.values, pseudocount = args.pseudocount)
+npmi_matrix_hap2 = calculate_NPMI_steps (subset_segtable_hap2.values, pseudocount = args.pseudocount)
+npmi_matrix_both = calculate_NPMI_steps (subset_segtable_both.values, pseudocount = args.pseudocount)
 
 print("="*40 + "\n")
 
