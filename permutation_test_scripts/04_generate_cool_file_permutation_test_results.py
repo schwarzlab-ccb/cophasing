@@ -123,21 +123,20 @@ npmi_matrix_both[np.array(tbr), :] = np.nan  # set rows to NaN
 """
 Generate dataframe with 'chr:start-end' information as rownames and column names
 """
-def add_chr_column(array, chr, resolution):
-    # Create an array with the specified strings
-    chr_column = np.array([f'{chr}:{i}-{i+int(resolution)}' for i in range(0, len(array)*int(resolution), int(resolution))])
+# Bin labels are taken from the segregation table index rather than rebuilt from
+# the resolution: the last window of a chromosome is truncated at the chromosome
+# end, so start + resolution is wrong for it and the bin would not match the BED.
+bin_labels = np.array([
+    f'{args.chr}:{start}-{stop}'
+    for start, stop in zip(subset_segtable_hap1.index.get_level_values('start'),
+                           subset_segtable_hap1.index.get_level_values('stop'))
+])
 
-    # Add the new column to the beginning of the existing array
-    array_with_chr_column = np.column_stack((chr_column, array))
-    
-    # Generate column and row names
-    column_names = np.array([f'{chr}:{i}-{i+int(resolution)}' for i in range(0, array.shape[1]*int(resolution), int(resolution))])
-    
-    # Convert to Pandas DataFrame and set row names as index
-    df = pd.DataFrame(data=array, columns=column_names)
-    df.index = chr_column   
-    
-    return df
+
+def add_chr_column(array, labels=bin_labels):
+    if array.shape != (len(labels), len(labels)):
+        raise ValueError(f"matrix is {array.shape}, but {args.chr} has {len(labels)} bins")
+    return pd.DataFrame(data=array, columns=labels, index=labels)
 
 
 def create_long_matrix(df):
@@ -174,8 +173,8 @@ os.makedirs(str(Path(args.output_dir) / '04_cool_files'), exist_ok=True)
 print("\n" + "="*40)
 
 
-def save_long_matrix_nan(chr, resolution, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path):
-    npmi_matrix_df = add_chr_column(data_matrix, chr = chr, resolution = resolution)
+def save_long_matrix_nan(chr, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path):
+    npmi_matrix_df = add_chr_column(data_matrix)
     long_matrix = create_long_matrix(npmi_matrix_df)
 
     output_file_path_long_mat = f'{directory_path}permutation_test_results_{data}_{chr}_long_matrix_nan.tsv.gz'
@@ -186,19 +185,19 @@ def save_long_matrix_nan(chr, resolution, data='npmi_matrix_hap1', data_matrix=n
     print(f"Output {data} saved to {output_file_path_long_mat}")
 
 # p_value_log_filter_npmi
-save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_npmi', data_matrix=p_value_log_filter_npmi, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, data='p_value_log_filter_npmi', data_matrix=p_value_log_filter_npmi, directory_path=directory_path)
 # p_value_log_filter_thresh_npmi
-save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_thresh_npmi', data_matrix=p_value_log_filter_thresh_npmi, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, data='p_value_log_filter_thresh_npmi', data_matrix=p_value_log_filter_thresh_npmi, directory_path=directory_path)
 # p_value_log_filter_thresh_npmi_directionality
-save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='p_value_log_filter_thresh_npmi_directionality', data_matrix=p_value_log_filter_thresh_npmi_directionality, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, data='p_value_log_filter_thresh_npmi_directionality', data_matrix=p_value_log_filter_thresh_npmi_directionality, directory_path=directory_path)
 # p_value_npmi_2sided_updated
-save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='p_value_npmi_2sided_updated', data_matrix=p_value_npmi_2sided_updated, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, data='p_value_npmi_2sided_updated', data_matrix=p_value_npmi_2sided_updated, directory_path=directory_path)
 # npmi_matrix_hap1
-save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, data='npmi_matrix_hap1', data_matrix=npmi_matrix_hap1, directory_path=directory_path)
 # npmi_matrix_hap2
-save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='npmi_matrix_hap2', data_matrix=npmi_matrix_hap2, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, data='npmi_matrix_hap2', data_matrix=npmi_matrix_hap2, directory_path=directory_path)
 # npmi_matrix_both
-save_long_matrix_nan(chr=args.chr, resolution = args.resolution, data='npmi_matrix_both', data_matrix=npmi_matrix_both, directory_path=directory_path)
+save_long_matrix_nan(chr=args.chr, data='npmi_matrix_both', data_matrix=npmi_matrix_both, directory_path=directory_path)
 print("="*40 + "\n")
 # #############
 
