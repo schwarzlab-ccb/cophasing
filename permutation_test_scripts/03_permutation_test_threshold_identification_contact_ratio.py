@@ -121,6 +121,9 @@ WITHOUT NAN AS TOTAL
 total number excluding masked nan values
 """
 knee_df = pd.DataFrame(knee_points.items(), columns=['chromosome', 'knee'])
+# A chromosome with no knee carries None; make it NaN so comparisons against the
+# threshold are simply false instead of raising.
+knee_df['knee'] = pd.to_numeric(knee_df['knee'], errors='coerce')
 # Find the maximum length of the ratio lists
 max_length = max(len(ratios) for ratios in ratios_dict.values())
 
@@ -131,8 +134,8 @@ for chrom in ratios_dict:
 # Convert the dictionary to a DataFrame
 ratios_df = pd.DataFrame(ratios_dict)
 
-# add indices 0 to max_length*0.1
-ratios_df.index = np.arange(0, max_length*THRESHOLD_STEP_SIZE, THRESHOLD_STEP_SIZE)
+# index is the threshold each row was measured at
+ratios_df.index = np.arange(max_length) * THRESHOLD_STEP_SIZE
 
 # Save the DataFrame to TSV files
 threshold_ratio_total_wo_nan_output_dir = threshold_output_dir + '/'
@@ -146,12 +149,6 @@ ratios_df.to_csv(output_tsv_path, sep = '\t')
 output_tsv_path = os.path.join(f"{threshold_ratio_total_wo_nan_output_dir}/knee_point_table_threshold_steps.tsv")
 knee_df.to_csv(output_tsv_path, sep = '\t')
 
-"""
-WITHOUT NAN AS TOTAL
-total number excluding masked nan values
-"""
-knee_df = knee_df.set_index('chromosome')
-
 print("\n" + "="*40)
 print("Thresholds calculated for all chromosomes using the knee point method.")
 print("="*40 + "\n")
@@ -160,10 +157,7 @@ print("="*40 + "\n")
 """
 calculate ratios for each chromosome separate for stronger on hap1 and hap2
 """
-# get dataframe with knee points for each chromosome
-threshold_df_file = os.path.join(threshold_ratio_total_wo_nan_output_dir, 'knee_point_table_threshold_steps.tsv')
-threshold_df = pd.read_csv(threshold_df_file, sep='\t', index_col=0)
-threshold_df = threshold_df.set_index('chromosome')
+threshold_df = knee_df.set_index('chromosome')
 
 ratios_hap1_dict = {}
 ratios_hap2_dict = {}
@@ -210,8 +204,7 @@ df_ratio = pd.DataFrame([
     {"chromosome": chr_, "hap1": ratios_hap1_dict.get(chr_, None), "hap2": ratios_hap2_dict.get(chr_, None)}
     for chr_ in chromosomes
 ])
-df_threshold = pd.read_csv(f'{threshold_ratio_total_wo_nan_output_dir}/knee_point_table_threshold_steps.tsv', sep='\t', index_col=0)
-df_threshold = df_threshold.rename(columns={"knee": "threshold"})
+df_threshold = knee_df.rename(columns={"knee": "threshold"})
 df_ratio_threshold = df_ratio.merge(df_threshold, on="chromosome", how="left")
 df_ratio_threshold['combined_ratio'] = df_ratio_threshold['hap1'] + df_ratio_threshold['hap2']
 df_ratio_threshold['hap1_percentage'] = (df_ratio_threshold['hap1'] * 100).round(2)
